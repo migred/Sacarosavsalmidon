@@ -7,7 +7,8 @@ import '@xyflow/react/dist/style.css'
 import type { Balance, Derived } from './App'
 
 type Props = { balance: Balance; derived: Derived }
-type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'; corridor?: number; waypoints?: {x:number;y:number}[] }
+type RegulationReason = { kind:'activation'|'inhibition'|'context'; text:string }
+type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'|'elbow'; corridor?: number; waypoints?: {x:number;y:number}[]; reasons?: RegulationReason[]; tooltipSide?:'above'|'below' }
 
 const level = (v = 0) => v < 25 ? 'low' : v < 65 ? 'normal' : v < 82 ? 'high' : 'critical'
 const clamp = (v:number) => Math.max(0,Math.min(100,v))
@@ -18,6 +19,18 @@ function FourHandles() {
       <Handle type="source" position={p} id={`s-${p}`} className="bio-handle" />
       <Handle type="target" position={p} id={`t-${p}`} className="bio-handle" />
     </span>)}
+  </>
+}
+
+function EnzymeHandles(){
+  const sides=[Position.Top,Position.Right,Position.Bottom,Position.Left] as Position[]
+  return <>
+    {sides.map(position=><Handle key={`source-${position}`} type="source" position={position} id={`s-${position}`} className="bio-handle"/>)}
+    {sides.flatMap(position=>[1,2,3].map(slot=>{
+      const along=`${slot*25}%`
+      const style=position===Position.Left||position===Position.Right?{top:along}:{left:along}
+      return <Handle key={`${position}-${slot}`} type="target" position={position} id={`t-reg-${position}-${slot}`} className="reg-handle" style={style}/>
+    }))}
   </>
 }
 
@@ -35,7 +48,11 @@ const EnzymeNode = memo(({ data }: NodeProps) => {
   const d = data as FlowData
   const activity=d.activity??0
   const activityClass=activity<25?'activity-low':activity<55?'activity-medium':activity<80?'activity-high':'activity-very-high'
-  return <div className={`enzyme-node ${activityClass}`}><FourHandles /><b>{d.label}</b><span>Actividad {Math.round(activity)}%</span><i><em style={{ width:`${activity}%` }} /></i></div>
+  const summary=(d.reasons??[]).map(reason=>reason.text).join('. ')
+  return <div className={`enzyme-node ${activityClass}`} title={`${d.label}. Actividad ${Math.round(activity)}%. ${summary}`} aria-label={`${d.label}, actividad ${Math.round(activity)}%. ${summary}`}>
+    <EnzymeHandles /><b>{d.label}</b><span>Actividad {Math.round(activity)}%</span><i><em style={{ width:`${activity}%` }} /></i>
+    {!!d.reasons?.length&&<div className={`enzyme-tooltip ${d.tooltipSide==='below'?'below':'above'}`} role="tooltip"><strong>¿Por qué {Math.round(activity)}%?</strong>{d.reasons.map((reason,index)=><span className={reason.kind} key={index}>{reason.kind==='activation'?'▲':reason.kind==='inhibition'?'⊣':'•'} {reason.text}</span>)}</div>}
+  </div>
 })
 
 const TransportNode = memo(({ data }: NodeProps) => {
@@ -79,6 +96,7 @@ const RegulatoryEdge = memo((props: EdgeProps) => {
     ? <line x1={endX} y1={endY-barHalf} x2={endX} y2={endY+barHalf} />
     : <line x1={endX-barHalf} y1={endY} x2={endX+barHalf} y2={endY} />)
   return <g className={`reg-edge ${kind}`} style={{ opacity }}>
+    {kind!=='catalysis'&&<BaseEdge path={path} style={{stroke:'#fffdf4',strokeWidth:width+3.5,opacity:.92}}/>}
     <BaseEdge path={path} markerEnd={kind === 'activation' ? props.markerEnd : undefined} style={{ stroke:color, strokeWidth:width, strokeDasharray:kind==='catalysis'?'5 3':undefined }} />
     {bar && <g stroke={color} strokeWidth={Math.max(3,width)}>{bar}</g>}
     {kind === 'catalysis' && <circle cx={endX} cy={endY} r="4.5" fill="white" stroke={color} strokeWidth="2.5" />}
@@ -92,8 +110,14 @@ const BidirectionalEdge = memo((props: EdgeProps) => {
   const length = Math.max(1, Math.hypot(dx,dy))
   const nx = -dy / length * 5
   const ny = dx / length * 5
-  const forward = `M ${props.sourceX+nx} ${props.sourceY+ny} L ${props.targetX+nx} ${props.targetY+ny}`
-  const reverse = `M ${props.targetX-nx} ${props.targetY-ny} L ${props.sourceX-nx} ${props.sourceY-ny}`
+  const cornerX=(props.sourceX+props.targetX)/2
+  const elbow=d?.route==='elbow'
+  const forward = elbow
+    ? `M ${props.sourceX} ${props.sourceY+5} L ${cornerX+5} ${props.sourceY+5} L ${cornerX+5} ${props.targetY+5} L ${props.targetX} ${props.targetY+5}`
+    : `M ${props.sourceX+nx} ${props.sourceY+ny} L ${props.targetX+nx} ${props.targetY+ny}`
+  const reverse = elbow
+    ? `M ${props.targetX} ${props.targetY-5} L ${cornerX-5} ${props.targetY-5} L ${cornerX-5} ${props.sourceY-5} L ${props.sourceX} ${props.sourceY-5}`
+    : `M ${props.targetX-nx} ${props.targetY-ny} L ${props.sourceX-nx} ${props.sourceY-ny}`
   const width = (flux=0) => .9 + flux / 22
   return <g className="bidirectional-edge">
     <BaseEdge path={forward} markerEnd={props.markerEnd} style={{stroke:'#435b4e',strokeWidth:width(d?.forwardFlux),opacity:.88}} />
@@ -117,39 +141,72 @@ const edgeTypes = { reaction:ReactionEdge, regulatory:RegulatoryEdge, reversible
 
 const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:58},draggable:false })
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
-const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38) => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity},style:{width,height},draggable:false })
+const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38,reasons:RegulationReason[]=[],tooltipSide:'above'|'below'='above') => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity,reasons,tooltipSide},style:{width,height},draggable:false })
 const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:14,height:14}:undefined,selectable:false })
 const regulation = (id:string,source:string,target:string,kind:'activation'|'inhibition'|'catalysis',active:boolean,strength:number,sourceHandle:string,targetHandle:string,route?:FlowData['route'],corridor?:number,waypoints?:FlowData['waypoints']) => ({ id,type:'regulatory',source,target,sourceHandle,targetHandle,data:{kind,active,strength,route,corridor,waypoints},markerEnd:kind==='activation'?{type:MarkerType.ArrowClosed,color:'#247c43',width:16+strength*.05,height:16+strength*.05}:undefined,selectable:false })
-const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:13,height:13},selectable:false })
+const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string,route?:'elbow') => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux,route},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:13,height:13},selectable:false })
 const transport = (id:string,source:string,target:string,kind:'pi'|'triose',flux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'tpt',source,target,sourceHandle,targetHandle,data:{kind,flux},markerEnd:{type:MarkerType.ArrowClosed,color:kind==='pi'?'#477eb2':'#ad772b',width:17,height:17},selectable:false })
 
 function makeElements(b:Balance,d:Derived) {
+  const pct=(value:number)=>`${Math.round(value)}%`
+  const activator=(label:string,value:number,threshold=45):RegulationReason=>value>=threshold
+    ? {kind:'activation',text:`${label} elevado (${pct(value)}) favorece la actividad`}
+    : {kind:'context',text:`${label} bajo (${pct(value)}) aporta poca activación`}
+  const inhibitor=(label:string,value:number,threshold=55):RegulationReason=>value>=threshold
+    ? {kind:'inhibition',text:`${label} acumulado (${pct(value)}) reprime la enzima`}
+    : {kind:'context',text:`${label} bajo (${pct(value)}) alivia la inhibición`}
+  const substrate=(label:string,value:number):RegulationReason=>({kind:'context',text:`Disponibilidad de ${label}: ${pct(value)}`})
+  const pga=Math.min(100,b.trioseStroma*1.25)
+  const strongest=<T extends {strength:number},>(signals:T[])=>signals.reduce((winner,signal)=>signal.strength>winner.strength?signal:winner)
+  const spsDominant=strongest([
+    {id:'g6',label:'activación por G6P',strength:d.g6p*.62},
+    {id:'pi',label:'inhibición por Pi citosólico',strength:b.piCyt*.38},
+    {id:'sucrose',label:'retroinhibición por sacarosa',strength:Math.max(0,d.sucrosePool-70)/30*100},
+  ])
+  const f26kDominant=strongest([
+    {id:'f6',label:'activación por F6P',strength:d.f6p*.65},
+    {id:'pi',label:'activación por Pi citosólico',strength:b.piCyt*.38},
+    {id:'triose',label:'inhibición por triosas-P',strength:b.trioseCyt*.25},
+  ])
+  const agpDominant=strongest([
+    {id:'pga',label:'activación por 3-PGA',strength:pga},
+    {id:'pi',label:'inhibición por Pi estromático',strength:b.piStroma},
+  ])
+  const winner=(label:string):RegulationReason=>({kind:'context',text:`Línea visible: ${label}; las señales menores se omiten del mapa`})
   const nodes:any[] = [
-    {id:'cytosol',type:'compartment',position:{x:0,y:0},data:{label:'Citosol',note:'síntesis de sacarosa',compartment:'cytosol'},style:{width:620,height:680},draggable:false,selectable:false},
-    {id:'chloroplast',type:'compartment',position:{x:720,y:0},data:{label:'Cloroplasto',note:'estroma · síntesis de almidón',compartment:'chloroplast'},style:{width:420,height:680},draggable:false,selectable:false},
+    {id:'cytosol',type:'compartment',position:{x:0,y:0},data:{label:'Citosol',note:'síntesis de sacarosa',compartment:'cytosol'},style:{width:720,height:680},draggable:false,selectable:false},
+    {id:'chloroplast',type:'compartment',position:{x:840,y:0},data:{label:'Cloroplasto',note:'estroma · síntesis de almidón',compartment:'chloroplast'},style:{width:560,height:680},draggable:false,selectable:false},
 
-    met('sucrose','Sacarosa',d.sucrosePool,'cytosol',260,25,'producto',112), met('s6p','Sacarosa-6P',d.sucroseFlux,'cytosol',260,115),
-    met('udp','UDP-glucosa',d.g6p*.55,'cytosol',430,245), met('g1c','G1P',d.g6p*.62,'cytosol',440,335),
-    met('g6c','G6P',d.g6p,'cytosol',310,335,'activa SPS'), met('f6c','F6P',d.f6p,'cytosol',180,335),
-    met('f16c','F1,6BP',b.trioseCyt*.86,'cytosol',180,430), met('triosec','Triosas-P',b.trioseCyt,'cytosol',475,520,'citosol'),
-    met('f26','F2,6BP',d.f26bp,'cytosol',25,335,'regulador'), met('pic','Pi',b.piCyt,'cytosol',500,615,'citosol · fuera'),
-    proc('p_spp','Sacarosa-fosfato fosfatasa','cytosol',303,88),proc('p_sps','Sacarosa-fosfato sintasa','cytosol',303,190),proc('p_fbp','Fructosa-1,6-bisfosfatasa','cytosol',222,398),
-    enz('e_spp','Sacarosa-fosfato fosfatasa',d.sucroseFlux,'cytosol',350,72,155,50),enz('e_sps','Sacarosa-fosfato sintasa',d.sps,'cytosol',345,164,150,52),
-    enz('e_udpg','UGPasa',d.g6p,'cytosol',525,298,80),enz('e_pgm_c','PGM',d.g6p,'cytosol',375,290,64),enz('e_pgi_c','PGI',d.g6p,'cytosol',245,290,64),
-    enz('e_fbp','Fructosa-1,6-bisfosfatasa',d.fbpase,'cytosol',255,382,165,52),enz('e_ald_c','Aldolasa',b.trioseCyt,'cytosol',335,550,84),
-    enz('e_f26k','Fructosa-6-fosfato 2-quinasa',d.f26Kinase,'cytosol',40,253,170,56),enz('e_f26b','Fructosa-2,6-bisfosfatasa',d.f26Bisphosphatase,'cytosol',35,402,165,52),
+    met('sucrose','Sacarosa',d.sucrosePool,'cytosol',300,25,'producto',112), met('s6p','Sacarosa-6P',d.sucroseFlux,'cytosol',300,115),
+    met('udp','UDP-glucosa',d.g6p*.55,'cytosol',520,245), met('g1c','G1P',d.g6p*.62,'cytosol',540,335),
+    met('g6c','G6P',d.g6p,'cytosol',380,335,'activa SPS'), met('f6c','F6P',d.f6p,'cytosol',210,335),
+    met('f16c','F1,6BP',b.trioseCyt*.86,'cytosol',210,430), met('triosec','Triosas-P',b.trioseCyt,'cytosol',580,520,'citosol'),
+    met('f26','F2,6BP',d.f26bp,'cytosol',25,335,'regulador'), met('pic','Pi',b.piCyt,'cytosol',600,615,'citosol · fuera'),
+    proc('p_spp','Sacarosa-fosfato fosfatasa','cytosol',343,88),proc('p_sps','Sacarosa-fosfato sintasa','cytosol',343,190),proc('p_fbp','Fructosa-1,6-bisfosfatasa','cytosol',252,398),
+    enz('e_spp','Sacarosa-fosfato fosfatasa',d.sucroseFlux,'cytosol',400,72,165,50,[substrate('sacarosa-6P',d.sucroseFlux)],'below'),
+    enz('e_sps','Sacarosa-fosfato sintasa',d.sps,'cytosol',405,164,165,52,[activator('G6P',d.g6p,30),inhibitor('Pi citosólico',b.piCyt,55),inhibitor('sacarosa',d.sucrosePool,70),winner(spsDominant.label)],'below'),
+    enz('e_udpg','UGPasa',d.g6p,'cytosol',620,298,80,38,[substrate('G1P',d.g6p*.62)]),
+    enz('e_pgm_c','PGM',d.g6p,'cytosol',465,290,70,38,[substrate('G6P/G1P',d.g6p)]),
+    enz('e_pgi_c','PGI',d.g6p,'cytosol',290,290,70,38,[substrate('F6P/G6P',d.f6p)]),
+    enz('e_fbp','Fructosa-1,6-bisfosfatasa',d.fbpase,'cytosol',295,382,180,52,[inhibitor('F2,6BP',d.f26bp,55),substrate('F1,6BP',b.trioseCyt*.86)]),
+    enz('e_ald_c','Aldolasa',b.trioseCyt,'cytosol',460,485,92,44,[substrate('triosas-P',b.trioseCyt)]),
+    enz('e_f26k','Fructosa-6-fosfato 2-quinasa',d.f26Kinase,'cytosol',40,253,180,56,[activator('F6P',d.f6p,35),activator('Pi citosólico',b.piCyt,55),inhibitor('triosas-P citosólicas',b.trioseCyt,65),winner(f26kDominant.label)]),
+    enz('e_f26b','Fructosa-2,6-bisfosfatasa',d.f26Bisphosphatase,'cytosol',35,402,175,52,[inhibitor('Pi citosólico',b.piCyt,55),inhibitor('F6P',d.f6p,35)]),
 
-    met('starch','Almidón',d.starch,'chloroplast',150,25,'reserva',112),met('adpg','ADP-glucosa',d.starchFlux,'chloroplast',150,115),
-    met('g1s','G1P',b.trioseStroma*.58,'chloroplast',150,215),met('g6s','G6P',b.trioseStroma*.66,'chloroplast',150,305),
-    met('f6s','F6P',b.trioseStroma*.76,'chloroplast',150,395),met('f16s','F1,6BP',b.trioseStroma*.86,'chloroplast',150,485),
-    met('trioses','Triosas-P',b.trioseStroma,'chloroplast',20,520,'estroma'),met('pga','3-PGA',Math.min(100,b.trioseStroma*1.25),'chloroplast',285,520),
-    met('pis','Pi',b.piStroma,'chloroplast',5,615,'estroma · dentro'),
-    proc('p_starch','Almidón sintasa','chloroplast',193,90),proc('p_agp','ADP-glucosa pirofosforilasa','chloroplast',193,180),proc('p_fbp_s','Fructosa-1,6-bisfosfatasa','chloroplast',193,460),
-    enz('e_starch','Almidón sintasa',d.starchFlux,'chloroplast',265,70,135,48),enz('e_agp','ADP-glucosa pirofosforilasa',d.agpase,'chloroplast',250,156,155,52),
-    enz('e_pgm_s','PGM',b.trioseStroma,'chloroplast',280,270,65),enz('e_pgi_s','PGI',b.trioseStroma,'chloroplast',280,360,65),
-    enz('e_fbp_s','Fructosa-1,6-bisfosfatasa',b.trioseStroma,'chloroplast',245,442,160,52),enz('e_ald_s','Aldolasa',b.trioseStroma,'chloroplast',280,580,82),
+    met('starch','Almidón',d.starch,'chloroplast',210,25,'reserva',112),met('adpg','ADP-glucosa',d.starchFlux,'chloroplast',210,115),
+    met('g1s','G1P',b.trioseStroma*.58,'chloroplast',210,215),met('g6s','G6P',b.trioseStroma*.66,'chloroplast',210,305),
+    met('f6s','F6P',b.trioseStroma*.76,'chloroplast',210,395),met('f16s','F1,6BP',b.trioseStroma*.86,'chloroplast',210,485),
+    met('trioses','Triosas-P',b.trioseStroma,'chloroplast',25,520,'estroma'),met('pga','3-PGA',pga,'chloroplast',415,520),
+    met('pis','Pi',b.piStroma,'chloroplast',10,615,'estroma · dentro'),
+    proc('p_starch','Almidón sintasa','chloroplast',253,90),proc('p_agp','ADP-glucosa pirofosforilasa','chloroplast',253,180),proc('p_fbp_s','Fructosa-1,6-bisfosfatasa','chloroplast',253,460),
+    enz('e_starch','Almidón sintasa',d.starchFlux,'chloroplast',370,70,150,48,[substrate('ADP-glucosa',d.starchFlux)],'below'),
+    enz('e_agp','ADP-glucosa pirofosforilasa',d.agpase,'chloroplast',365,156,170,52,[activator('3-PGA',pga,40),inhibitor('Pi estromático',b.piStroma,55),winner(agpDominant.label)],'below'),
+    enz('e_pgm_s','PGM',b.trioseStroma,'chloroplast',380,270,70,38,[substrate('G1P/G6P',b.trioseStroma*.66)]),
+    enz('e_pgi_s','PGI',b.trioseStroma,'chloroplast',380,360,70,38,[substrate('G6P/F6P',b.trioseStroma*.76)]),
+    enz('e_fbp_s','Fructosa-1,6-bisfosfatasa',b.trioseStroma,'chloroplast',365,442,175,52,[substrate('F1,6BP',b.trioseStroma*.86)]),
+    enz('e_ald_s','Aldolasa',b.trioseStroma,'chloroplast',55,468,92,44,[substrate('triosas-P',b.trioseStroma)]),
 
-    {id:'tpt',type:'transport',position:{x:645,y:572},data:{activity:Math.abs(d.tpt),note:'antiporte acoplado'},style:{width:82,height:48},draggable:false,selectable:false},
+    {id:'tpt',type:'transport',position:{x:755,y:572},data:{activity:Math.abs(d.tpt),note:'orientación automática'},style:{width:82,height:48},draggable:false,selectable:false},
   ]
   const edges:any[] = [
     reaction('r_spp_1','s6p','p_spp',d.sucroseFlux,'s-top','t-bottom'),reaction('r_spp_2','p_spp','sucrose',d.sucroseFlux,'s-top','t-bottom',true),
@@ -158,7 +215,7 @@ function makeElements(b:Balance,d:Derived) {
     reversible('bi_pgm_c','g6c','g1c',d.g6p*.68,d.g6p*.32,'s-right','t-left'),
     reversible('bi_pgi_c','f6c','g6c',d.f6p*.46,d.g6p*.54,'s-right','t-left'),
     reaction('r_fbp1','f16c','p_fbp',d.fbpase,'s-top','t-bottom'),reaction('r_fbp2','p_fbp','f6c',d.fbpase,'s-top','t-bottom',true),
-    reversible('bi_ald_c','triosec','f16c',b.trioseCyt*.7,b.trioseCyt*.3,'s-left','t-right'),
+    reversible('bi_ald_c','triosec','f16c',b.trioseCyt*.7,b.trioseCyt*.3,'s-left','t-right','elbow'),
     reversible('bi_f26','f6c','f26',d.f26Kinase,d.f26Bisphosphatase,'s-left','t-right'),
 
     reaction('r_starch1','adpg','p_starch',d.starchFlux,'s-top','t-bottom'),reaction('r_starch2','p_starch','starch',d.starchFlux,'s-top','t-bottom',true),
@@ -166,7 +223,7 @@ function makeElements(b:Balance,d:Derived) {
     reversible('bi_pgm_s','g6s','g1s',b.trioseStroma*.62,b.trioseStroma*.38,'s-top','t-bottom'),
     reversible('bi_pgi_s','f6s','g6s',b.trioseStroma*.56,b.trioseStroma*.44,'s-top','t-bottom'),
     reaction('r_fbp_s1','f16s','p_fbp_s',b.trioseStroma,'s-top','t-bottom'),reaction('r_fbp_s2','p_fbp_s','f6s',b.trioseStroma,'s-top','t-bottom',true),
-    reversible('bi_ald_s','trioses','f16s',b.trioseStroma*.72,b.trioseStroma*.28,'s-right','t-left'),
+    reversible('bi_ald_s','trioses','f16s',b.trioseStroma*.72,b.trioseStroma*.28,'s-right','t-left','elbow'),
     reaction('r_pga','pga','trioses',b.trioseStroma,'s-left','t-right',true),
 
     regulation('cat_spp','e_spp','p_spp','catalysis',true,d.sucroseFlux,'s-left','t-right'),regulation('cat_sps','e_sps','p_sps','catalysis',true,d.sps,'s-left','t-right'),
@@ -174,18 +231,20 @@ function makeElements(b:Balance,d:Derived) {
     regulation('cat_starch','e_starch','p_starch','catalysis',true,d.starchFlux,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,d.agpase,'s-left','t-right'),
     regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,b.trioseStroma,'s-left','t-right'),
 
-    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,d.f26bp,'s-left','t-right',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:440,y:510},{x:440,y:408}]),
-    regulation('reg_pi_sps','pic','e_sps','inhibition',b.piCyt>=65,b.piCyt,'s-right','t-right','right',610),
-    regulation('reg_g6_sps','g6c','e_sps','activation',d.g6p>=30,d.g6p,'s-bottom','t-right',undefined,undefined,[{x:362,y:400},{x:610,y:400},{x:610,y:193}]),
-    regulation('reg_suc_sps','sucrose','e_sps','inhibition',d.sucrosePool>=70,d.sucrosePool,'s-right','t-right','right',610),
-    regulation('reg_pi_f26k','pic','e_f26k','activation',b.piCyt>=55,b.piCyt,'s-left','t-left','left',10),
-    regulation('reg_tri_f26k','triosec','e_f26k','inhibition',b.trioseCyt>=65,b.trioseCyt,'s-left','t-left','left',10),
-    regulation('reg_pi_f26b','pic','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-left','t-left','left',10),
-    regulation('reg_f6_f26k','f6c','e_f26k','activation',d.f6p>=35,d.f6p,'s-top','t-right',undefined,undefined,[{x:232,y:245},{x:220,y:245},{x:220,y:281}]),
-    regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-right',undefined,undefined,[{x:220,y:393},{x:220,y:428}]),
-    regulation('reg_pi_agp','pis','e_agp','inhibition',b.piStroma>=65,b.piStroma,'s-right','t-right','right',1130),
-    regulation('reg_pga_agp','pga','e_agp','activation',b.trioseStroma>=30,Math.min(100,b.trioseStroma*1.25),'s-right','t-right','right',1130),
+    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,d.f26bp,'s-left','t-reg-right-2',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:495,y:510},{x:495,y:408}]),
+    regulation('reg_pi_f26b','pic','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-left','t-reg-left-2','left',8),
+    regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-reg-right-2',undefined,undefined,[{x:230,y:393},{x:230,y:428}]),
   ]
+  if(spsDominant.id==='pi') edges.push(regulation('reg_pi_sps','pic','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-2','right',712))
+  if(spsDominant.id==='g6') edges.push(regulation('reg_g6_sps','g6c','e_sps','activation',true,spsDominant.strength,'s-bottom','t-reg-right-3',undefined,undefined,[{x:432,y:400},{x:700,y:400},{x:700,y:203}]))
+  if(spsDominant.id==='sucrose') edges.push(regulation('reg_suc_sps','sucrose','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-1','right',724))
+
+  if(f26kDominant.id==='pi') edges.push(regulation('reg_pi_f26k','pic','e_f26k','activation',true,f26kDominant.strength,'s-left','t-reg-left-1','left',8))
+  if(f26kDominant.id==='triose') edges.push(regulation('reg_tri_f26k','triosec','e_f26k','inhibition',true,f26kDominant.strength,'s-left','t-reg-left-3','left',18))
+  if(f26kDominant.id==='f6') edges.push(regulation('reg_f6_f26k','f6c','e_f26k','activation',true,f26kDominant.strength,'s-top','t-reg-right-2',undefined,undefined,[{x:262,y:245},{x:230,y:245},{x:230,y:281}]))
+
+  if(agpDominant.id==='pi') edges.push(regulation('reg_pi_agp','pis','e_agp','inhibition',true,agpDominant.strength,'s-right','t-reg-right-1','right',1390))
+  if(agpDominant.id==='pga') edges.push(regulation('reg_pga_agp','pga','e_agp','activation',true,agpDominant.strength,'s-right','t-reg-right-3','right',1378))
   if(d.tpt>=0){
     edges.push(
       transport('tpt_triose','trioses','triosec','triose',Math.abs(d.tpt),'s-left','t-right'),
@@ -202,7 +261,7 @@ function makeElements(b:Balance,d:Derived) {
 
 export function MetabolicFlow({balance,derived}:Props){
   const {nodes,edges}=useMemo(()=>makeElements(balance,derived),[balance,derived])
-  return <div className="flow-stage"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.015,minZoom:.68,maxZoom:1.15}} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll zoomOnPinch zoomOnScroll>
+  return <div className="flow-stage"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.005,minZoom:.68,maxZoom:1.3}} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll zoomOnPinch zoomOnScroll>
     <Background color="#dfe6dc" gap={24} size={1}/><Controls showInteractive={false}/>
   </ReactFlow></div>
 }
