@@ -1,6 +1,6 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.7: simplificación dinámica de la regulación. Cuando una enzima recibe señales antagónicas, el mapa muestra únicamente la conexión del regulador con mayor intensidad en la configuración actual. Las demás señales siguen interviniendo en el cálculo de la actividad, pero se omiten visualmente y se explican en el tooltip de la enzima.
+Versión 1.0.8: incorpora un control de triosas-P citosólicas acoplado al Pi mediante el TPT, bloquea el desplazamiento del lienzo mientras se muestra el encuadre completo y añade una referencia cuantitativa experimental de Arabidopsis. También fuerza un nuevo ajuste del mapa al inicializar React Flow para evitar un lienzo vacío.
 
 > Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
 
@@ -27,11 +27,19 @@ El proyecto incluye un flujo de GitHub Actions. En el repositorio, selecciona **
 
 ## Interacción y balances
 
-Los tres deslizadores representan la carga floemática, el tamaño del depósito de fosfato intercambiable y la cuota celular de Pi citosólico. La fijación de CO₂ no se ajusta: se mantiene constante en los escenarios diurnos. Al reducir la carga floemática se acumula sacarosa y aumenta su retroinhibición sobre SPS.
+Los cuatro deslizadores representan la carga floemática, el tamaño del depósito de fosfato intercambiable, la cuota celular de Pi citosólico y las triosas-P citosólicas. La fijación de CO₂ no se ajusta: se mantiene constante en los escenarios diurnos. Al reducir la carga floemática se acumula sacarosa y aumenta su retroinhibición sobre SPS.
 
 El fosfato intercambiable se distribuye entre Pi citosólico, Pi estromático, triosas-P citosólicas y triosas-P estromáticas. Sus fracciones suman siempre el 100 %. Al aumentar la cuota de Pi citosólico disminuyen simultáneamente las otras tres fracciones. El TPT mueve una triosa-P y un Pi en sentidos opuestos, sin crear ni destruir fosfato.
 
+El control de triosa-P citosólica modifica el reparto inicial entre ambos compartimentos. Después, el TPT recalcula conjuntamente las cuatro fracciones: una acumulación suficiente de TP en el citosol favorece su retorno al estroma y la entrada compensatoria de Pi al citosol.
+
 La dirección del TPT se obtiene del desequilibrio `TPest·Picit − TPcit·Piest`. Una extensión positiva exporta triosa-P al citosol e introduce Pi en el estroma; una extensión negativa realiza el intercambio contrario. No existe un control manual de velocidad: el intercambio se orienta automáticamente y queda limitado únicamente por los sustratos disponibles. Después del transporte se recalculan todas las concentraciones y actividades enzimáticas.
+
+El lienzo no captura el desplazamiento vertical en su vista completa. El desplazamiento y arrastre se activan únicamente después de ampliar el mapa mediante los controles de zoom o un gesto de pellizco.
+
+## Referencia experimental
+
+La interfaz incluye valores de Szecowka et al. (2013, *The Plant Cell*, DOI `10.1105/tpc.112.106989`), obtenidos mediante marcaje de rosetas iluminadas con 13CO₂: síntesis de sacarosa de 7,11 y de almidón de 3,19 nmol de C g⁻¹ de peso fresco s⁻¹, relación 2,2:1; DHAP de 2,7 ± 0,6 nmol g⁻¹, distribuido 77 % en citosol y 23 % en plastidio. El estudio trata DHAP y 3-PGA de ambos compartimentos como depósitos en rápido equilibrio isotópico por el TPT, pero no ofrece un único flujo neto de TPT directamente utilizable para calibrar este simulador.
 
 El carbono fijado se reparte entre sacarosa exportada, almidón almacenado y carbono soluble retenido. Estas tres fracciones también se normalizan para sumar el 100 % del carbono entrante. La salida al floema se trata como demanda o flujo, no como concentración; el depósito interno de sacarosa se calcula por separado.
 

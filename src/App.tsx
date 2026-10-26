@@ -6,6 +6,7 @@ export type Controls = {
   phloemLoading: number
   phosphatePool: number
   cytosolicPi: number
+  cytosolicTriose: number
   phase: 'day' | 'night'
 }
 
@@ -29,7 +30,7 @@ type Model = { balance: Balance; derived: Derived }
 type Scenario = { id: string; title: string; question: string; focus: string; controls: Controls }
 
 const DAY_CARBON_FIXATION = 80
-const INITIAL: Controls = { phloemLoading: 60, phosphatePool: 65, cytosolicPi: 42, phase:'day' }
+const INITIAL: Controls = { phloemLoading: 60, phosphatePool: 65, cytosolicPi: 42, cytosolicTriose:60, phase:'day' }
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
 
 function applyTptAntiport(piCyt:number,piStroma:number,trioseCyt:number,trioseStroma:number){
@@ -56,12 +57,12 @@ function applyTptAntiport(piCyt:number,piStroma:number,trioseCyt:number,trioseSt
 
 const SCENARIOS: Scenario[] = [
   { id:'day', title:'Día · estado basal', question:'¿Cómo se reparte el carbono con luz y carga floemática moderada?', focus:'La fijación diurna permanece constante; utiliza este estado como referencia.', controls:INITIAL },
-  { id:'phloem', title:'Carga floemática alta', question:'¿Qué ocurre si el floema retira sacarosa constantemente?', focus:'Observa el depósito de sacarosa, SPS y el sentido espontáneo del TPT.', controls:{phloemLoading:92,phosphatePool:65,cytosolicPi:55,phase:'day'} },
-  { id:'blocked', title:'Cierre de carga', question:'¿Qué ocurre cuando cesa bruscamente la carga del floema?', focus:'Busca acumulación de sacarosa, retroinhibición de SPS y desvío hacia almidón.', controls:{phloemLoading:0,phosphatePool:65,cytosolicPi:38,phase:'day'} },
-  { id:'night', title:'Noche', question:'¿Cómo cambia el reparto sin fijación de CO₂ y con movilización de reservas?', focus:'Compara el suministro nocturno desde almidón con el estado diurno.', controls:{phloemLoading:35,phosphatePool:58,cytosolicPi:58,phase:'night'} },
-  { id:'pi-cyt', title:'Pi alto en citosol', question:'¿Cómo responde la ruta cuando aumenta la cuota celular de Pi citosólico?', focus:'Comprueba que bajan Pi estromático y triosas-P y sigue la regulación enzimática.', controls:{phloemLoading:45,phosphatePool:85,cytosolicPi:90,phase:'day'} },
-  { id:'pi-stroma', title:'Pi bajo en citosol', question:'¿Qué sucede cuando el reparto favorece el Pi del estroma?', focus:'Observa la relación 3-PGA/Pi, AGPasa y el sentido del TPT.', controls:{phloemLoading:55,phosphatePool:85,cytosolicPi:8,phase:'day'} },
-  { id:'triose', title:'Acumulación de triosas-P', question:'¿Qué pasa cuando el carbono se retiene y aumenta la fracción fosforilada?', focus:'Observa la orientación del TPT y la inhibición de F6P-2-quinasa.', controls:{phloemLoading:12,phosphatePool:48,cytosolicPi:24,phase:'day'} },
+  { id:'phloem', title:'Carga floemática alta', question:'¿Qué ocurre si el floema retira sacarosa constantemente?', focus:'Observa el depósito de sacarosa, SPS y el sentido espontáneo del TPT.', controls:{phloemLoading:92,phosphatePool:65,cytosolicPi:55,cytosolicTriose:45,phase:'day'} },
+  { id:'blocked', title:'Cierre de carga', question:'¿Qué ocurre cuando cesa bruscamente la carga del floema?', focus:'Busca acumulación de sacarosa, retroinhibición de SPS y desvío hacia almidón.', controls:{phloemLoading:0,phosphatePool:65,cytosolicPi:38,cytosolicTriose:72,phase:'day'} },
+  { id:'night', title:'Noche', question:'¿Cómo cambia el reparto sin fijación de CO₂ y con movilización de reservas?', focus:'Compara el suministro nocturno desde almidón con el estado diurno.', controls:{phloemLoading:35,phosphatePool:58,cytosolicPi:58,cytosolicTriose:42,phase:'night'} },
+  { id:'pi-cyt', title:'Pi alto en citosol', question:'¿Cómo responde la ruta cuando aumenta la cuota celular de Pi citosólico?', focus:'Comprueba que bajan Pi estromático y triosas-P y sigue la regulación enzimática.', controls:{phloemLoading:45,phosphatePool:85,cytosolicPi:90,cytosolicTriose:45,phase:'day'} },
+  { id:'pi-stroma', title:'Pi bajo en citosol', question:'¿Qué sucede cuando el reparto favorece el Pi del estroma?', focus:'Observa la relación 3-PGA/Pi, AGPasa y el sentido del TPT.', controls:{phloemLoading:55,phosphatePool:85,cytosolicPi:8,cytosolicTriose:55,phase:'day'} },
+  { id:'triose', title:'Acumulación de triosas-P', question:'¿Qué pasa cuando se eleva la triosa-P citosólica?', focus:'Observa cómo cambia la orientación del antiporte y cómo responde el Pi citosólico.', controls:{phloemLoading:12,phosphatePool:48,cytosolicPi:24,cytosolicTriose:92,phase:'day'} },
 ]
 
 function derive(c: Controls): Model {
@@ -71,13 +72,13 @@ function derive(c: Controls): Model {
   const carbonInput = c.phase === 'day' ? DAY_CARBON_FIXATION : 26
   const retention = 100 - c.phloemLoading
 
-  // El deslizador de Pi citosólico cambia la composición del depósito celular completo:
-  // su aumento eleva Picit y reduce simultáneamente Piest, TPcit y TPest.
+  // Ambos deslizadores cambian la composición celular antes del equilibrio del TPT.
+  // Elevar TPcit desplaza TP hacia el estroma y Pi en sentido contrario.
   const compositionWeights = {
     piCyt: 8 + c.cytosolicPi * .92,
     piStroma: 86 - c.cytosolicPi * .58 + (c.phase === 'night' ? 12 : 0),
-    trioseCyt: 38 + retention * .20 - c.cytosolicPi * .16,
-    trioseStroma: 66 + carbonInput * .20 + retention * .22 - c.cytosolicPi * .22,
+    trioseCyt: 18 + c.cytosolicTriose * .62 + retention * .16 - c.cytosolicPi * .10,
+    trioseStroma: 102 - c.cytosolicTriose * .46 + carbonInput * .18 + retention * .18 - c.cytosolicPi * .16,
   }
   const compositionTotal = Object.values(compositionWeights).reduce((sum,value)=>sum+Math.max(2,value),0)
   const share = (value:number) => Math.max(2,value) / compositionTotal * 100
@@ -162,6 +163,7 @@ export default function App(){
         <div className="pair-title"><ArrowDownUp/><span>Fosfato</span><small>depósito global conservado</small></div>
         <Slider label="Fosfato intercambiable" value={controls.phosphatePool} color="#477eb2" onChange={v=>setControl('phosphatePool',v)} hint="Tamaño relativo del depósito Pi + metabolitos fosforilados."/>
         <Slider label="Cuota de Pi citosólico" value={controls.cytosolicPi} color="#477eb2" onChange={v=>setControl('cytosolicPi',v)} hint="Al subir, disminuyen Pi estromático y las fracciones de triosa-P; el total sigue siendo 100%."/>
+        <Slider label="Triosas-P en citosol" value={controls.cytosolicTriose} color="#ad772b" onChange={v=>setControl('cytosolicTriose',v)} hint="Al subir, aumenta TP citosólica y el antiporte acoplado modifica el Pi citosólico; si domina el gradiente, Pi entra desde el estroma."/>
         <div className="pair-title"><Waves/><span>TPT automático</span><small>sin control de velocidad</small></div>
         <div className="phosphate-readout">
           <div><span>Pi citosol</span><b>{d.piCytShare.toFixed(1)}%</b></div><div><span>Pi estroma</span><b>{d.piStromaShare.toFixed(1)}%</b></div>
@@ -186,6 +188,13 @@ export default function App(){
           <div className="budget-bar" aria-label="Distribución del carbono fijado"><i className="to-sucrose" style={{width:`${d.sucroseShare}%`}}/><i className="to-starch" style={{width:`${d.starchShare}%`}}/><i className="retained" style={{width:`${d.intermediateShare}%`}}/></div>
           <div className="budget-legend"><span><i className="to-sucrose"/>Sacarosa exportada <b>{d.sucroseShare.toFixed(1)}%</b></span><span><i className="to-starch"/>{controls.phase==='day'?'Almidón almacenado':'Almidón remanente'} <b>{d.starchShare.toFixed(1)}%</b></span><span><i className="retained"/>Carbono soluble <b>{d.intermediateShare.toFixed(1)}%</b></span></div>
         </div>
+
+        <aside className="experimental-reference" aria-label="Referencia experimental">
+          <div><span>REFERENCIA EXPERIMENTAL · <i>Arabidopsis</i> ILUMINADA</span><b>Flujos estimados mediante marcaje con <sup>13</sup>CO₂</b></div>
+          <dl><div><dt>Síntesis de sacarosa</dt><dd>7,11 nmol C·g⁻¹ PF·s⁻¹</dd></div><div><dt>Síntesis de almidón</dt><dd>3,19 nmol C·g⁻¹ PF·s⁻¹</dd></div><div><dt>Relación sacarosa/almidón</dt><dd>2,2 : 1</dd></div><div><dt>DHAP</dt><dd>77% citosol · 23% plastidio</dd></div></dl>
+          <p>El intercambio TPT fue lo bastante rápido para tratar DHAP y 3-PGA citosólicos y plastídicos como depósitos en equilibrio isotópico; el artículo no proporciona un flujo neto único del TPT transferible directamente a este simulador.</p>
+          <a href="https://doi.org/10.1105/tpc.112.106989" target="_blank" rel="noreferrer">Szecowka et al., 2013 · The Plant Cell ↗</a>
+        </aside>
 
         <div className="metrics">
           <div><span>Actividad SPS</span><b>{d.sps.toFixed(0)}%</b></div>

@@ -1,7 +1,7 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef, useState } from 'react'
 import {
   Background, BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow,
-  getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps, type NodeProps,
+  getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps, type NodeProps, type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { Balance, Derived } from './App'
@@ -261,7 +261,20 @@ function makeElements(b:Balance,d:Derived) {
 
 export function MetabolicFlow({balance,derived}:Props){
   const {nodes,edges}=useMemo(()=>makeElements(balance,derived),[balance,derived])
-  return <div className="flow-stage"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.005,minZoom:.68,maxZoom:1.3}} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll zoomOnPinch zoomOnScroll>
+  const fittedZoom=useRef<number|null>(null)
+  const [isZoomed,setIsZoomed]=useState(false)
+  const fitOnInit=(instance:ReactFlowInstance)=>{
+    requestAnimationFrame(()=>{
+      Promise.resolve(instance.fitView({padding:.01,minZoom:.68,maxZoom:1.3})).then(()=>{
+        fittedZoom.current=instance.getViewport().zoom
+        setIsZoomed(false)
+      })
+    })
+  }
+  return <div className={`flow-stage ${isZoomed?'canvas-zoomed':'canvas-fitted'}`}>
+    <div className="canvas-scroll-hint">{isZoomed?'Zoom activo · desplazamiento habilitado':'Vista completa · desplazamiento bloqueado'}</div>
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.01,minZoom:.68,maxZoom:1.3}} onInit={fitOnInit} onMoveEnd={(_,viewport)=>setIsZoomed(fittedZoom.current!==null&&viewport.zoom>fittedZoom.current+.025)} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll={isZoomed} panOnDrag={isZoomed} preventScrolling={isZoomed} zoomOnPinch zoomOnScroll={false}>
     <Background color="#dfe6dc" gap={24} size={1}/><Controls showInteractive={false}/>
-  </ReactFlow></div>
+    </ReactFlow>
+  </div>
 }
