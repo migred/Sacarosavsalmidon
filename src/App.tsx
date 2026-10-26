@@ -105,8 +105,10 @@ function derive(c: Controls): Model {
   // F6P y Pi activan la quinasa; las triosas-P la inhiben. Pi y F6P inhiben la fosfatasa.
   const f26Kinase = clamp(16 + f6p * .65 + piCyt * .38 - trioseCyt * .25)
   const f26Bisphosphatase = clamp(78 - piCyt * .48 - f6p * .32)
-  const f26bp = clamp(f26Kinase * .68 + (100 - f26Bisphosphatase) * .32)
-  const fbpase = clamp(100 - f26bp * .72)
+  // Respuesta deliberadamente exagerada para que F2,6BP funcione como un
+  // interruptor didáctico y no parezca permanentemente acumulado.
+  const f26bp = clamp(50 + (f26Kinase - f26Bisphosphatase) * 1.6)
+  const fbpase = clamp(100 - f26bp * .88)
   const sucrosePool = clamp(12 + carbonInput * .72 + trioseCyt * .35 - c.phloemLoading * .68 + (c.phase==='night'?8:0))
   const feedback = sucrosePool > 70 ? clamp((100 - sucrosePool) * 1.7) : 100
   const sps = clamp((g6p * .62 + (100 - piCyt) * .38) * feedback / 100)
@@ -205,7 +207,7 @@ export default function App(){
         <div className="map-card">
           <div className="map-title"><div><span>MAPA BIOQUÍMICO INTERACTIVO</span><h1>Partición del carbono fotosintético</h1></div><div className="map-legend"><i className="low"/>Bajo<i className="normal"/>Medio<i className="high"/>Alto<i className="critical"/>Umbral</div></div>
           <MetabolicFlow balance={balance} derived={d}/>
-          <div className="sbgn-key"><span><b>□</b> metabolito</span><span><b>○</b> proceso</span><span><b>→</b> dirigida</span><span><b>⇄</b> reversible</span><span><b>⊣</b> inhibición</span><span><b>△</b> activación</span><span><b>Pi repetido:</b> réplicas del mismo depósito</span><span><b>Regulación:</b> se muestra la señal dominante</span><span><b>Enzima:</b> rojo baja · ámbar media · verde alta</span><span><b>Pasa el cursor</b> para explicar su actividad</span></div>
+          <div className="sbgn-key"><span><b>□</b> metabolito</span><span><b>○</b> proceso</span><span><b>→</b> dirigida</span><span><b>⇄</b> reversible</span><span><b>⊣</b> inhibición</span><span><b>△</b> activación</span><span><b>Pi repetido:</b> réplicas del mismo depósito</span><span><b>Regulación:</b> se muestra la señal dominante</span><span><b>Enzima:</b> rojo baja · ámbar media · verde alta</span><span><b>Pasa el cursor:</b> viñeta explicativa</span></div>
         </div>
         <div className="interpretation"><Info/><div><b>Respuesta regulatoria</b><p>{d.sucrosePool>=70?'La sacarosa acumulada ejerce retroinhibición sobre SPS. ':d.sps<25?'La síntesis de sacarosa está limitada por sustrato o por Pi. ':'SPS conserva capacidad para sostener la síntesis de sacarosa. '}{balance.piCyt>=65?'El Pi citosólico alto inhibe SPS y modifica el balance F6P-2-quinasa/F2,6BPasa. ':''}{balance.piStroma>=65?'El Pi estromático reduce la relación 3-PGA/Pi e inhibe AGPasa. ':d.agpase>=70?'La relación carbono/Pi activa AGPasa y favorece el almidón. ':'AGPasa responde al balance carbono/Pi. '}El TPT intercambia una triosa-P por un Pi, sin cambiar el fosfato total.</p></div></div>
       </section>

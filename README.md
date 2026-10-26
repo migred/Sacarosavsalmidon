@@ -1,6 +1,6 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.9: replica visualmente el Pi junto a las enzimas que regula, siguiendo el esquema bioquímico de referencia, y reduce las cabezas de flecha para evitar giros y deformaciones en conexiones cortas. Todas las réplicas de Pi muestran el mismo valor y representan un único depósito en el balance.
+Versión 1.0.11: amplía y recoloca las réplicas locales de Pi, mantiene siempre visible su conexión correcta con la enzima correspondiente, desvía la regulación F2,6BP→FBPasa para que no atraviese la aldolasa y exagera deliberadamente la respuesta de F2,6BP para facilitar su interpretación didáctica.
 
 > Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
 
@@ -51,7 +51,7 @@ Cada cambio actualiza:
 - las activaciones e inhibiciones dependientes de umbrales;
 - la dirección neta del antiporte TPT, representado mediante dos únicas flechas continuas y opuestas: una para triosas-P y otra para Pi.
 
-Para evitar interpretar como simultáneamente dominantes señales opuestas, SPS, F6P-2-quinasa y AGPasa muestran una sola línea reguladora: la de mayor intensidad relativa, ponderada por el coeficiente o umbral con el que actúa en el modelo. El regulador visible puede cambiar al mover un deslizador o seleccionar otro escenario. Las señales menores no desaparecen del modelo matemático; únicamente se ocultan del mapa.
+Para evitar interpretar como simultáneamente dominantes señales opuestas, SPS, F6P-2-quinasa y AGPasa destacan la línea de mayor intensidad relativa, ponderada por el coeficiente o umbral con el que actúa en el modelo. El regulador dominante puede cambiar al mover un deslizador o seleccionar otro escenario. Como excepción visual, las conexiones locales del Pi se mantienen siempre visibles para identificar la función de cada réplica; se muestran más tenues cuando no son dominantes.
 
 La sección **Casos fisiológicos** incorpora siete estados predefinidos: día basal, carga floemática alta, cierre de carga, noche, Pi alto en citosol, Pi bajo en citosol y acumulación de triosas-P. Al modificar manualmente cualquier deslizador se activa la exploración libre.
 
@@ -61,7 +61,9 @@ Las interconversiones mediante PGI, PGM, UGPasa y aldolasa se representan median
 
 Las regulaciones de largo alcance se conducen por corredores exteriores al mapa metabólico para evitar atravesar metabolitos o enzimas. Cada activador o inhibidor llega a un puerto distinto de la tarjeta enzimática; un halo claro separa cruces y mantiene visibles las puntas de activación y las barras de inhibición.
 
-El Pi se repite como pequeños nodos locales junto a SPS, F6P-2-quinasa, F2,6BPasa y AGPasa. Estas copias son alias gráficos sincronizados, no depósitos adicionales: el Pi sólo se contabiliza una vez en cada compartimento. Los nodos grandes inferiores se reservan para representar el intercambio del TPT.
+El Pi se repite como nodos locales junto a SPS, F6P-2-quinasa, F2,6BPasa y AGPasa. Estas copias son alias gráficos sincronizados, no depósitos adicionales: el Pi sólo se contabiliza una vez en cada compartimento. Los nodos grandes inferiores se reservan para representar el intercambio del TPT. Pi activa F6P-2-quinasa, mientras que inhibe SPS, F2,6BPasa y AGPasa.
+
+La relación entre la actividad de F6P-2-quinasa, F2,6BPasa y la concentración de F2,6BP se ha hecho deliberadamente más intensa y de tipo interruptor, sin pretender una respuesta fisiológica calibrada. El objetivo es que el regulador pase claramente entre estados bajo y alto y que su inhibición de FBPasa sea visible durante la exploración.
 
 ## Alcance científico
 

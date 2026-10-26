@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useState } from 'react'
 import {
   Background, BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow,
-  getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps, type NodeProps, type ReactFlowInstance,
+  getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps, type Node, type NodeProps, type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { Balance, Derived } from './App'
@@ -9,6 +9,7 @@ import type { Balance, Derived } from './App'
 type Props = { balance: Balance; derived: Derived }
 type RegulationReason = { kind:'activation'|'inhibition'|'context'; text:string }
 type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'|'elbow'; corridor?: number; waypoints?: {x:number;y:number}[]; reasons?: RegulationReason[]; tooltipSide?:'above'|'below' }
+type EnzymePopover = { x:number; y:number; side:'left'|'right'; label:string; activity:number; reasons:RegulationReason[] }
 
 const level = (v = 0) => v < 25 ? 'low' : v < 65 ? 'normal' : v < 82 ? 'high' : 'critical'
 const clamp = (v:number) => Math.max(0,Math.min(100,v))
@@ -54,9 +55,8 @@ const EnzymeNode = memo(({ data }: NodeProps) => {
   const activity=d.activity??0
   const activityClass=activity<25?'activity-low':activity<55?'activity-medium':activity<80?'activity-high':'activity-very-high'
   const summary=(d.reasons??[]).map(reason=>reason.text).join('. ')
-  return <div className={`enzyme-node ${activityClass}`} title={`${d.label}. Actividad ${Math.round(activity)}%. ${summary}`} aria-label={`${d.label}, actividad ${Math.round(activity)}%. ${summary}`}>
+  return <div className={`enzyme-node ${activityClass}`} aria-label={`${d.label}, actividad ${Math.round(activity)}%. ${summary}`}>
     <EnzymeHandles /><b>{d.label}</b><span>Actividad {Math.round(activity)}%</span><i><em style={{ width:`${activity}%` }} /></i>
-    {!!d.reasons?.length&&<div className={`enzyme-tooltip ${d.tooltipSide==='below'?'below':'above'}`} role="tooltip"><strong>¿Por qué {Math.round(activity)}%?</strong>{d.reasons.map((reason,index)=><span className={reason.kind} key={index}>{reason.kind==='activation'?'▲':reason.kind==='inhibition'?'⊣':'•'} {reason.text}</span>)}</div>}
   </div>
 })
 
@@ -145,7 +145,7 @@ const nodeTypes = { metabolite:MetaboliteNode, piAlias:PiAliasNode, process:Proc
 const edgeTypes = { reaction:ReactionEdge, regulatory:RegulatoryEdge, reversible:BidirectionalEdge, tpt:TptEdge }
 
 const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:58},draggable:false })
-const piAlias=(id:string,value:number,parentId:string,x:number,y:number)=>({id,type:'piAlias',parentId,extent:'parent' as const,position:{x,y},data:{label:'Pi',value},style:{width:24,height:24},draggable:false,selectable:false})
+const piAlias=(id:string,value:number,parentId:string,x:number,y:number)=>({id,type:'piAlias',parentId,extent:'parent' as const,position:{x,y},data:{label:'Pi',value},style:{width:40,height:40},draggable:false,selectable:false})
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
 const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38,reasons:RegulationReason[]=[],tooltipSide:'above'|'below'='above') => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity,reasons,tooltipSide},style:{width,height},draggable:false })
 const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:9,height:9}:undefined,selectable:false })
@@ -188,7 +188,7 @@ function makeElements(b:Balance,d:Derived) {
     met('g6c','G6P',d.g6p,'cytosol',380,335,'activa SPS'), met('f6c','F6P',d.f6p,'cytosol',210,335),
     met('f16c','F1,6BP',b.trioseCyt*.86,'cytosol',210,430), met('triosec','Triosas-P',b.trioseCyt,'cytosol',580,520,'citosol'),
     met('f26','F2,6BP',d.f26bp,'cytosol',25,335,'regulador'), met('pic','Pi',b.piCyt,'cytosol',600,615,'citosol · fuera'),
-    piAlias('pic_sps',b.piCyt,'cytosol',366,178),piAlias('pic_f26k',b.piCyt,'cytosol',73,205),piAlias('pic_f26b',b.piCyt,'cytosol',110,470),
+    piAlias('pic_sps',b.piCyt,'cytosol',590,170),piAlias('pic_f26k',b.piCyt,'cytosol',65,195),piAlias('pic_f26b',b.piCyt,'cytosol',102,474),
     proc('p_spp','Sacarosa-fosfato fosfatasa','cytosol',343,88),proc('p_sps','Sacarosa-fosfato sintasa','cytosol',343,190),proc('p_fbp','Fructosa-1,6-bisfosfatasa','cytosol',252,398),
     enz('e_spp','Sacarosa-fosfato fosfatasa',d.sucroseFlux,'cytosol',400,72,165,50,[substrate('sacarosa-6P',d.sucroseFlux)],'below'),
     enz('e_sps','Sacarosa-fosfato sintasa',d.sps,'cytosol',405,164,165,52,[activator('G6P',d.g6p,30),inhibitor('Pi citosólico',b.piCyt,55),inhibitor('sacarosa',d.sucrosePool,70),winner(spsDominant.label)],'below'),
@@ -205,7 +205,7 @@ function makeElements(b:Balance,d:Derived) {
     met('f6s','F6P',b.trioseStroma*.76,'chloroplast',210,395),met('f16s','F1,6BP',b.trioseStroma*.86,'chloroplast',210,485),
     met('trioses','Triosas-P',b.trioseStroma,'chloroplast',25,520,'estroma'),met('pga','3-PGA',pga,'chloroplast',415,520),
     met('pis','Pi',b.piStroma,'chloroplast',10,615,'estroma · dentro'),
-    piAlias('pis_agp',b.piStroma,'chloroplast',325,170),
+    piAlias('pis_agp',b.piStroma,'chloroplast',300,162),
     proc('p_starch','Almidón sintasa','chloroplast',253,90),proc('p_agp','ADP-glucosa pirofosforilasa','chloroplast',253,180),proc('p_fbp_s','Fructosa-1,6-bisfosfatasa','chloroplast',253,460),
     enz('e_starch','Almidón sintasa',d.starchFlux,'chloroplast',370,70,150,48,[substrate('ADP-glucosa',d.starchFlux)],'below'),
     enz('e_agp','ADP-glucosa pirofosforilasa',d.agpase,'chloroplast',365,156,170,52,[activator('3-PGA',pga,40),inhibitor('Pi estromático',b.piStroma,55),winner(agpDominant.label)],'below'),
@@ -239,19 +239,19 @@ function makeElements(b:Balance,d:Derived) {
     regulation('cat_starch','e_starch','p_starch','catalysis',true,d.starchFlux,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,d.agpase,'s-left','t-right'),
     regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,b.trioseStroma,'s-left','t-right'),
 
-    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,d.f26bp,'s-left','t-reg-right-2',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:495,y:510},{x:495,y:408}]),
+    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=55,d.f26bp,'s-left','t-reg-right-2',undefined,undefined,[{x:10,y:364},{x:10,y:540},{x:570,y:540},{x:570,y:408}]),
     regulation('reg_pi_f26b','pic_f26b','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-top','t-reg-bottom-2'),
+    regulation('reg_pi_sps','pic_sps','e_sps','inhibition',spsDominant.id==='pi',spsDominant.id==='pi'?spsDominant.strength:b.piCyt*.38,'s-left','t-reg-right-2'),
+    regulation('reg_pi_f26k','pic_f26k','e_f26k','activation',f26kDominant.id==='pi',f26kDominant.id==='pi'?f26kDominant.strength:b.piCyt*.38,'s-bottom','t-reg-top-1'),
+    regulation('reg_pi_agp','pis_agp','e_agp','inhibition',agpDominant.id==='pi',b.piStroma,'s-right','t-reg-left-2'),
     regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-reg-right-2',undefined,undefined,[{x:230,y:393},{x:230,y:428}]),
   ]
-  if(spsDominant.id==='pi') edges.push(regulation('reg_pi_sps','pic_sps','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-left-2'))
   if(spsDominant.id==='g6') edges.push(regulation('reg_g6_sps','g6c','e_sps','activation',true,spsDominant.strength,'s-bottom','t-reg-right-3',undefined,undefined,[{x:432,y:400},{x:700,y:400},{x:700,y:203}]))
   if(spsDominant.id==='sucrose') edges.push(regulation('reg_suc_sps','sucrose','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-1','right',724))
 
-  if(f26kDominant.id==='pi') edges.push(regulation('reg_pi_f26k','pic_f26k','e_f26k','activation',true,f26kDominant.strength,'s-bottom','t-reg-top-1'))
   if(f26kDominant.id==='triose') edges.push(regulation('reg_tri_f26k','triosec','e_f26k','inhibition',true,f26kDominant.strength,'s-left','t-reg-left-3','left',18))
   if(f26kDominant.id==='f6') edges.push(regulation('reg_f6_f26k','f6c','e_f26k','activation',true,f26kDominant.strength,'s-top','t-reg-right-2',undefined,undefined,[{x:262,y:245},{x:230,y:245},{x:230,y:281}]))
 
-  if(agpDominant.id==='pi') edges.push(regulation('reg_pi_agp','pis_agp','e_agp','inhibition',true,agpDominant.strength,'s-right','t-reg-left-2'))
   if(agpDominant.id==='pga') edges.push(regulation('reg_pga_agp','pga','e_agp','activation',true,agpDominant.strength,'s-right','t-reg-right-3','right',1378))
   if(d.tpt>=0){
     edges.push(
@@ -269,8 +269,22 @@ function makeElements(b:Balance,d:Derived) {
 
 export function MetabolicFlow({balance,derived}:Props){
   const {nodes,edges}=useMemo(()=>makeElements(balance,derived),[balance,derived])
+  const stageRef=useRef<HTMLDivElement>(null)
   const fittedZoom=useRef<number|null>(null)
   const [isZoomed,setIsZoomed]=useState(false)
+  const [popover,setPopover]=useState<EnzymePopover|null>(null)
+  const showPopover=(event:React.MouseEvent,node:Node)=>{
+    if(node.type!=='enzyme'||!stageRef.current)return
+    const data=node.data as FlowData
+    const bounds=stageRef.current.getBoundingClientRect()
+    const activity=data.activity??0
+    const cursorX=event.clientX-bounds.left
+    const rawY=event.clientY-bounds.top+14
+    const side=cursorX+278>bounds.width?'left':'right'
+    const x=Math.max(8,Math.min(side==='left'?cursorX-276:cursorX+14,bounds.width-278))
+    const y=Math.max(8,Math.min(rawY,bounds.height-170))
+    setPopover({x,y,side,label:data.label,activity,reasons:data.reasons??[]})
+  }
   const fitOnInit=(instance:ReactFlowInstance)=>{
     requestAnimationFrame(()=>{
       Promise.resolve(instance.fitView({padding:.01,minZoom:.68,maxZoom:1.3})).then(()=>{
@@ -279,10 +293,14 @@ export function MetabolicFlow({balance,derived}:Props){
       })
     })
   }
-  return <div className={`flow-stage ${isZoomed?'canvas-zoomed':'canvas-fitted'}`}>
+  return <div ref={stageRef} className={`flow-stage ${isZoomed?'canvas-zoomed':'canvas-fitted'}`}>
     <div className="canvas-scroll-hint">{isZoomed?'Zoom activo · desplazamiento habilitado':'Vista completa · desplazamiento bloqueado'}</div>
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.01,minZoom:.68,maxZoom:1.3}} onInit={fitOnInit} onMoveEnd={(_,viewport)=>setIsZoomed(fittedZoom.current!==null&&viewport.zoom>fittedZoom.current+.025)} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll={isZoomed} panOnDrag={isZoomed} preventScrolling={isZoomed} zoomOnPinch zoomOnScroll={false}>
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.01,minZoom:.68,maxZoom:1.3}} onInit={fitOnInit} onMoveEnd={(_,viewport)=>setIsZoomed(fittedZoom.current!==null&&viewport.zoom>fittedZoom.current+.025)} onNodeMouseEnter={showPopover} onNodeMouseMove={showPopover} onNodeMouseLeave={()=>setPopover(null)} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll={isZoomed} panOnDrag={isZoomed} preventScrolling={isZoomed} zoomOnPinch zoomOnScroll={false}>
     <Background color="#dfe6dc" gap={24} size={1}/><Controls showInteractive={false}/>
     </ReactFlow>
+    {popover&&<div className={`enzyme-popover ${popover.side}`} role="tooltip" style={{left:popover.x,top:popover.y}}>
+      <div><strong>{popover.label}</strong><span className={popover.activity<35?'repressed':popover.activity>=70?'active':'intermediate'}>{popover.activity<35?'Reprimida o limitada':popover.activity>=70?'Activa':'Actividad intermedia'} · {Math.round(popover.activity)}%</span></div>
+      {popover.reasons.map((reason,index)=><p className={reason.kind} key={index}><b>{reason.kind==='activation'?'▲':reason.kind==='inhibition'?'⊣':'•'}</b>{reason.text}</p>)}
+    </div>}
   </div>
 }
