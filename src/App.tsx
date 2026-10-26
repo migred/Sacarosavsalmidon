@@ -21,7 +21,7 @@ export type Balance = {
 export type Derived = {
   f6p: number; g6p: number; f26bp: number; f26Kinase: number; f26Bisphosphatase: number
   sucrosePool: number; starch: number; sps: number; fbpase: number; agpase: number
-  tpt: number; sucroseFlux: number; starchFlux: number
+  tpt: number; tptExtent: number; sucroseFlux: number; starchFlux: number
   sucroseShare: number; starchShare: number; intermediateShare: number
   piCytShare: number; piStromaShare: number; trioseCytShare: number; trioseStromaShare: number
 }
@@ -31,6 +31,28 @@ type Scenario = { id: string; title: string; question: string; focus: string; co
 
 const INITIAL: Controls = { carbonFixation: 70, sinkDemand: 55, phosphatePool: 65, piDistribution: 50, tptCapacity: 75 }
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
+
+function applyTptAntiport(piCyt:number,piStroma:number,trioseCyt:number,trioseStroma:number,capacity:number){
+  // TPest + Picit <-> TPcit + Piest. Para K≈1, la extensión que elimina
+  // el desequilibrio es (TPest·Picit - TPcit·Piest) / depósito total.
+  const total = piCyt + piStroma + trioseCyt + trioseStroma
+  const drive = trioseStroma * piCyt - trioseCyt * piStroma
+  const equilibriumExtent = total > 0 ? drive / total : 0
+  const requestedExtent = equilibriumExtent * capacity / 100
+  const maxForward = Math.min(trioseStroma,piCyt)
+  const maxReverse = Math.min(trioseCyt,piStroma)
+  const extent = Math.max(-maxReverse,Math.min(maxForward,requestedExtent))
+  const limitingPool = extent >= 0 ? maxForward : maxReverse
+  const relativeFlux = limitingPool > 0 ? Math.abs(extent) / limitingPool * 100 * Math.sign(extent) : 0
+  return {
+    piCyt:piCyt-extent,
+    piStroma:piStroma+extent,
+    trioseCyt:trioseCyt+extent,
+    trioseStroma:trioseStroma-extent,
+    extent,
+    relativeFlux,
+  }
+}
 
 const SCENARIOS: Scenario[] = [
   { id:'baseline', title:'Equilibrio basal', question:'¿Cómo se reparte el carbono con fijación y demanda moderadas?', focus:'Utiliza este estado como referencia para comparar los otros casos.', controls:INITIAL },
@@ -47,14 +69,16 @@ function derive(c: Controls): Model {
   const phosphateScale = .35 + c.phosphatePool * .0065
   const boundP = clamp(12 + c.carbonFixation * .45 + (100 - c.sinkDemand) * .10)
   const freeP = 100 - boundP
-  const piCytShare = freeP * c.piDistribution / 100
-  const piStromaShare = freeP - piCytShare
+  const initialPiCytShare = freeP * c.piDistribution / 100
+  const initialPiStromaShare = freeP - initialPiCytShare
 
-  // La fijación aporta carbono; la demanda del sumidero consume las triosas citosólicas.
-  // La capacidad del TPT determina cuánto se aproximan ambos compartimentos al equilibrio.
-  const cytTrioseFraction = clamp(55 - c.sinkDemand * .30 + (100 - c.tptCapacity) * .10 + (c.piDistribution - 50) * .10) / 100
-  const trioseCytShare = boundP * cytTrioseFraction
-  const trioseStromaShare = boundP - trioseCytShare
+  // La fijación aporta carbono y la demanda del sumidero consume triosas citosólicas.
+  // El TPT se aplica después como una redistribución estequiométrica acoplada.
+  const cytTrioseFraction = clamp(55 - c.sinkDemand * .30) / 100
+  const initialTrioseCytShare = boundP * cytTrioseFraction
+  const initialTrioseStromaShare = boundP - initialTrioseCytShare
+  const transported = applyTptAntiport(initialPiCytShare,initialPiStromaShare,initialTrioseCytShare,initialTrioseStromaShare,c.tptCapacity)
+  const {piCyt:piCytShare,piStroma:piStromaShare,trioseCyt:trioseCytShare,trioseStroma:trioseStromaShare}=transported
   const asConcentration = (share: number) => clamp(share * 2 * phosphateScale)
 
   const piCyt = asConcentration(piCytShare)
@@ -65,8 +89,10 @@ function derive(c: Controls): Model {
 
   const f6p = clamp(trioseCyt * .82)
   const g6p = clamp(f6p * 1.06)
-  const f26Kinase = clamp(16 + f6p * .55 + piCyt * .32)
-  const f26Bisphosphatase = clamp(78 - piCyt * .48 + trioseCyt * .12)
+  // Regulación del ciclo F6P/F2,6BP según el esquema de referencia:
+  // F6P y Pi activan la quinasa; las triosas-P la inhiben. Pi y F6P inhiben la fosfatasa.
+  const f26Kinase = clamp(16 + f6p * .65 + piCyt * .38 - trioseCyt * .25)
+  const f26Bisphosphatase = clamp(78 - piCyt * .48 - f6p * .32)
   const f26bp = clamp(f26Kinase * .68 + (100 - f26Bisphosphatase) * .32)
   const fbpase = clamp(100 - f26bp * .72)
   const sucrosePool = clamp(18 + c.carbonFixation * .65 + trioseCyt * .35 - c.sinkDemand * .65)
@@ -74,10 +100,8 @@ function derive(c: Controls): Model {
   const sps = clamp((g6p * .62 + (100 - piCyt) * .38) * feedback / 100)
   const agpRatio = trioseStroma / Math.max(8, piStroma)
   const agpase = clamp(agpRatio * 64)
-  const outward = trioseStroma * piCyt
-  const inward = trioseCyt * piStroma
-  const tptDrive = clamp(Math.abs(outward - inward) / 30) * Math.sign(outward - inward)
-  const tpt = tptDrive * c.tptCapacity / 100
+  const tpt = transported.relativeFlux
+  const tptExtent = transported.extent
 
   // Reparto de un mismo presupuesto de carbono. Las tres fracciones se normalizan
   // conjuntamente y, por definición, suman el 100 % del carbono fijado.
@@ -93,7 +117,7 @@ function derive(c: Controls): Model {
   const starchFlux = starchShare * throughput
   const starch = clamp(12 + starchFlux * .88)
 
-  return { balance, derived:{ f6p,g6p,f26bp,f26Kinase,f26Bisphosphatase,sucrosePool,starch,sps,fbpase,agpase,tpt,sucroseFlux,starchFlux,sucroseShare,starchShare,intermediateShare,piCytShare,piStromaShare,trioseCytShare,trioseStromaShare } }
+  return { balance, derived:{ f6p,g6p,f26bp,f26Kinase,f26Bisphosphatase,sucrosePool,starch,sps,fbpase,agpase,tpt,tptExtent,sucroseFlux,starchFlux,sucroseShare,starchShare,intermediateShare,piCytShare,piStromaShare,trioseCytShare,trioseStromaShare } }
 }
 
 function Slider({label,value,color,hint,onChange}:{label:string;value:number;color:string;hint:string;onChange:(v:number)=>void}){
@@ -133,6 +157,7 @@ export default function App(){
           <div><span>Pi citosol</span><b>{d.piCytShare.toFixed(1)}%</b></div><div><span>Pi estroma</span><b>{d.piStromaShare.toFixed(1)}%</b></div>
           <div><span>Triosas-P citosol</span><b>{d.trioseCytShare.toFixed(1)}%</b></div><div><span>Triosas-P estroma</span><b>{d.trioseStromaShare.toFixed(1)}%</b></div>
           <strong>Σ fosfato intercambiable = {(d.piCytShare+d.piStromaShare+d.trioseCytShare+d.trioseStromaShare).toFixed(0)}%</strong>
+          <small className="tpt-coupling">{Math.abs(d.tptExtent)<.05?'TPT en equilibrio':d.tptExtent>0?`TPT desplaza ${Math.abs(d.tptExtent).toFixed(1)}%: triosa-P → citosol y Pi → estroma`:`TPT desplaza ${Math.abs(d.tptExtent).toFixed(1)}%: triosa-P → estroma y Pi → citosol`}</small>
         </div>
         <button className="reset" onClick={reset}><RotateCcw/>Restablecer</button>
       </aside>

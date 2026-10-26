@@ -1,6 +1,8 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.1: revisión de legibilidad para visualización al 100 % en el navegador. Aumenta la tipografía de controles, metabolitos, enzimas, leyendas e interpretación; amplía el panel lateral y el lienzo; y evita que el ajuste inicial de React Flow reduzca excesivamente el mapa.
+Versión 1.0.3: revisión de legibilidad, regulación y antiporte TPT. El transportador se aplica como una redistribución estequiométrica real: cada triosa-P transportada obliga al movimiento de un Pi de igual magnitud en sentido contrario.
+
+> Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
 
 Aplicación didáctica interactiva para estudiar la partición del carbono fotosintético entre sacarosa y almidón. El mapa se representa con React Flow y componentes bioquímicos propios.
 
@@ -28,6 +30,8 @@ El proyecto incluye un flujo de GitHub Actions. En el repositorio, selecciona **
 Los cinco deslizadores representan condiciones externas: fijación de carbono, demanda del floema, tamaño del depósito de fosfato intercambiable, distribución del Pi libre y capacidad del TPT. Las concentraciones internas se calculan como resultados del modelo.
 
 El fosfato intercambiable se distribuye entre Pi citosólico, Pi estromático, triosas-P citosólicas y triosas-P estromáticas. Sus fracciones suman siempre el 100 %. El TPT mueve una triosa-P y un Pi en sentidos opuestos, sin crear ni destruir fosfato.
+
+La dirección del TPT se obtiene del desequilibrio `TPest·Picit − TPcit·Piest`. Una extensión positiva exporta triosa-P al citosol e introduce Pi en el estroma; una extensión negativa realiza el intercambio contrario. La extensión está limitada por la capacidad del TPT y por el menor de los dos sustratos disponibles. Después del transporte se recalculan todas las concentraciones y actividades enzimáticas.
 
 El carbono fijado se reparte entre sacarosa exportada, almidón almacenado y carbono soluble retenido. Estas tres fracciones también se normalizan para sumar el 100 % del carbono entrante. La salida al floema se trata como demanda o flujo, no como concentración; el depósito interno de sacarosa se calcula por separado.
 
