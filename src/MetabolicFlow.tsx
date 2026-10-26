@@ -39,6 +39,11 @@ const MetaboliteNode = memo(({ data }: NodeProps) => {
   return <div className={`metabolite-node ${level(d.value)}`}><FourHandles /><b>{d.label}</b><strong>{Math.round(d.value ?? 0)}%</strong>{d.note && <small>{d.note}</small>}</div>
 })
 
+const PiAliasNode = memo(({data}:NodeProps)=>{
+  const d=data as FlowData
+  return <div className={`pi-alias ${level(d.value)}`} title={`Pi ${Math.round(d.value??0)}% · réplica visual del mismo depósito`}><FourHandles/><b>Pi</b><small>{Math.round(d.value??0)}%</small></div>
+})
+
 const ProcessNode = memo(({ data }: NodeProps) => {
   const d = data as FlowData
   return <div className="process-node" title={d.label}><FourHandles /><span /></div>
@@ -136,16 +141,17 @@ const TptEdge = memo((props: EdgeProps) => {
   }} />
 })
 
-const nodeTypes = { metabolite:MetaboliteNode, process:ProcessNode, enzyme:EnzymeNode, transport:TransportNode, compartment:CompartmentNode }
+const nodeTypes = { metabolite:MetaboliteNode, piAlias:PiAliasNode, process:ProcessNode, enzyme:EnzymeNode, transport:TransportNode, compartment:CompartmentNode }
 const edgeTypes = { reaction:ReactionEdge, regulatory:RegulatoryEdge, reversible:BidirectionalEdge, tpt:TptEdge }
 
 const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:58},draggable:false })
+const piAlias=(id:string,value:number,parentId:string,x:number,y:number)=>({id,type:'piAlias',parentId,extent:'parent' as const,position:{x,y},data:{label:'Pi',value},style:{width:24,height:24},draggable:false,selectable:false})
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
 const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38,reasons:RegulationReason[]=[],tooltipSide:'above'|'below'='above') => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity,reasons,tooltipSide},style:{width,height},draggable:false })
-const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:14,height:14}:undefined,selectable:false })
-const regulation = (id:string,source:string,target:string,kind:'activation'|'inhibition'|'catalysis',active:boolean,strength:number,sourceHandle:string,targetHandle:string,route?:FlowData['route'],corridor?:number,waypoints?:FlowData['waypoints']) => ({ id,type:'regulatory',source,target,sourceHandle,targetHandle,data:{kind,active,strength,route,corridor,waypoints},markerEnd:kind==='activation'?{type:MarkerType.ArrowClosed,color:'#247c43',width:16+strength*.05,height:16+strength*.05}:undefined,selectable:false })
-const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string,route?:'elbow') => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux,route},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:13,height:13},selectable:false })
-const transport = (id:string,source:string,target:string,kind:'pi'|'triose',flux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'tpt',source,target,sourceHandle,targetHandle,data:{kind,flux},markerEnd:{type:MarkerType.ArrowClosed,color:kind==='pi'?'#477eb2':'#ad772b',width:17,height:17},selectable:false })
+const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:9,height:9}:undefined,selectable:false })
+const regulation = (id:string,source:string,target:string,kind:'activation'|'inhibition'|'catalysis',active:boolean,strength:number,sourceHandle:string,targetHandle:string,route?:FlowData['route'],corridor?:number,waypoints?:FlowData['waypoints']) => ({ id,type:'regulatory',source,target,sourceHandle,targetHandle,data:{kind,active,strength,route,corridor,waypoints},markerEnd:kind==='activation'?{type:MarkerType.ArrowClosed,color:'#247c43',width:8+strength*.018,height:8+strength*.018}:undefined,selectable:false })
+const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string,route?:'elbow') => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux,route},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:8,height:8},selectable:false })
+const transport = (id:string,source:string,target:string,kind:'pi'|'triose',flux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'tpt',source,target,sourceHandle,targetHandle,data:{kind,flux},markerEnd:{type:MarkerType.ArrowClosed,color:kind==='pi'?'#477eb2':'#ad772b',width:10,height:10},selectable:false })
 
 function makeElements(b:Balance,d:Derived) {
   const pct=(value:number)=>`${Math.round(value)}%`
@@ -182,6 +188,7 @@ function makeElements(b:Balance,d:Derived) {
     met('g6c','G6P',d.g6p,'cytosol',380,335,'activa SPS'), met('f6c','F6P',d.f6p,'cytosol',210,335),
     met('f16c','F1,6BP',b.trioseCyt*.86,'cytosol',210,430), met('triosec','Triosas-P',b.trioseCyt,'cytosol',580,520,'citosol'),
     met('f26','F2,6BP',d.f26bp,'cytosol',25,335,'regulador'), met('pic','Pi',b.piCyt,'cytosol',600,615,'citosol · fuera'),
+    piAlias('pic_sps',b.piCyt,'cytosol',366,178),piAlias('pic_f26k',b.piCyt,'cytosol',73,205),piAlias('pic_f26b',b.piCyt,'cytosol',110,470),
     proc('p_spp','Sacarosa-fosfato fosfatasa','cytosol',343,88),proc('p_sps','Sacarosa-fosfato sintasa','cytosol',343,190),proc('p_fbp','Fructosa-1,6-bisfosfatasa','cytosol',252,398),
     enz('e_spp','Sacarosa-fosfato fosfatasa',d.sucroseFlux,'cytosol',400,72,165,50,[substrate('sacarosa-6P',d.sucroseFlux)],'below'),
     enz('e_sps','Sacarosa-fosfato sintasa',d.sps,'cytosol',405,164,165,52,[activator('G6P',d.g6p,30),inhibitor('Pi citosólico',b.piCyt,55),inhibitor('sacarosa',d.sucrosePool,70),winner(spsDominant.label)],'below'),
@@ -198,6 +205,7 @@ function makeElements(b:Balance,d:Derived) {
     met('f6s','F6P',b.trioseStroma*.76,'chloroplast',210,395),met('f16s','F1,6BP',b.trioseStroma*.86,'chloroplast',210,485),
     met('trioses','Triosas-P',b.trioseStroma,'chloroplast',25,520,'estroma'),met('pga','3-PGA',pga,'chloroplast',415,520),
     met('pis','Pi',b.piStroma,'chloroplast',10,615,'estroma · dentro'),
+    piAlias('pis_agp',b.piStroma,'chloroplast',325,170),
     proc('p_starch','Almidón sintasa','chloroplast',253,90),proc('p_agp','ADP-glucosa pirofosforilasa','chloroplast',253,180),proc('p_fbp_s','Fructosa-1,6-bisfosfatasa','chloroplast',253,460),
     enz('e_starch','Almidón sintasa',d.starchFlux,'chloroplast',370,70,150,48,[substrate('ADP-glucosa',d.starchFlux)],'below'),
     enz('e_agp','ADP-glucosa pirofosforilasa',d.agpase,'chloroplast',365,156,170,52,[activator('3-PGA',pga,40),inhibitor('Pi estromático',b.piStroma,55),winner(agpDominant.label)],'below'),
@@ -232,18 +240,18 @@ function makeElements(b:Balance,d:Derived) {
     regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,b.trioseStroma,'s-left','t-right'),
 
     regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,d.f26bp,'s-left','t-reg-right-2',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:495,y:510},{x:495,y:408}]),
-    regulation('reg_pi_f26b','pic','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-left','t-reg-left-2','left',8),
+    regulation('reg_pi_f26b','pic_f26b','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-top','t-reg-bottom-2'),
     regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-reg-right-2',undefined,undefined,[{x:230,y:393},{x:230,y:428}]),
   ]
-  if(spsDominant.id==='pi') edges.push(regulation('reg_pi_sps','pic','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-2','right',712))
+  if(spsDominant.id==='pi') edges.push(regulation('reg_pi_sps','pic_sps','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-left-2'))
   if(spsDominant.id==='g6') edges.push(regulation('reg_g6_sps','g6c','e_sps','activation',true,spsDominant.strength,'s-bottom','t-reg-right-3',undefined,undefined,[{x:432,y:400},{x:700,y:400},{x:700,y:203}]))
   if(spsDominant.id==='sucrose') edges.push(regulation('reg_suc_sps','sucrose','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-1','right',724))
 
-  if(f26kDominant.id==='pi') edges.push(regulation('reg_pi_f26k','pic','e_f26k','activation',true,f26kDominant.strength,'s-left','t-reg-left-1','left',8))
+  if(f26kDominant.id==='pi') edges.push(regulation('reg_pi_f26k','pic_f26k','e_f26k','activation',true,f26kDominant.strength,'s-bottom','t-reg-top-1'))
   if(f26kDominant.id==='triose') edges.push(regulation('reg_tri_f26k','triosec','e_f26k','inhibition',true,f26kDominant.strength,'s-left','t-reg-left-3','left',18))
   if(f26kDominant.id==='f6') edges.push(regulation('reg_f6_f26k','f6c','e_f26k','activation',true,f26kDominant.strength,'s-top','t-reg-right-2',undefined,undefined,[{x:262,y:245},{x:230,y:245},{x:230,y:281}]))
 
-  if(agpDominant.id==='pi') edges.push(regulation('reg_pi_agp','pis','e_agp','inhibition',true,agpDominant.strength,'s-right','t-reg-right-1','right',1390))
+  if(agpDominant.id==='pi') edges.push(regulation('reg_pi_agp','pis_agp','e_agp','inhibition',true,agpDominant.strength,'s-right','t-reg-left-2'))
   if(agpDominant.id==='pga') edges.push(regulation('reg_pga_agp','pga','e_agp','activation',true,agpDominant.strength,'s-right','t-reg-right-3','right',1378))
   if(d.tpt>=0){
     edges.push(

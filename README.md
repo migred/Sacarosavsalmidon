@@ -1,6 +1,6 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.8: incorpora un control de triosas-P citosólicas acoplado al Pi mediante el TPT, bloquea el desplazamiento del lienzo mientras se muestra el encuadre completo y añade una referencia cuantitativa experimental de Arabidopsis. También fuerza un nuevo ajuste del mapa al inicializar React Flow para evitar un lienzo vacío.
+Versión 1.0.9: replica visualmente el Pi junto a las enzimas que regula, siguiendo el esquema bioquímico de referencia, y reduce las cabezas de flecha para evitar giros y deformaciones en conexiones cortas. Todas las réplicas de Pi muestran el mismo valor y representan un único depósito en el balance.
 
 > Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
 
@@ -60,6 +60,8 @@ El mapa separa los compartimentos citosólico y cloroplástico. Las etapas dirig
 Las interconversiones mediante PGI, PGM, UGPasa y aldolasa se representan mediante dos flechas antiparalelas. Sus grosores independientes muestran la preferencia relativa de cada sentido. El ciclo F6P/F2,6BP también utiliza dos flechas porque la síntesis y la hidrólisis dependen de enzimas diferentes. Las etapas SPS, SPP, FBPasa, AGPasa y formación de almidón permanecen dirigidas.
 
 Las regulaciones de largo alcance se conducen por corredores exteriores al mapa metabólico para evitar atravesar metabolitos o enzimas. Cada activador o inhibidor llega a un puerto distinto de la tarjeta enzimática; un halo claro separa cruces y mantiene visibles las puntas de activación y las barras de inhibición.
+
+El Pi se repite como pequeños nodos locales junto a SPS, F6P-2-quinasa, F2,6BPasa y AGPasa. Estas copias son alias gráficos sincronizados, no depósitos adicionales: el Pi sólo se contabiliza una vez en cada compartimento. Los nodos grandes inferiores se reservan para representar el intercambio del TPT.
 
 ## Alcance científico
 
