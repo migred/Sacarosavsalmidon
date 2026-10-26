@@ -106,7 +106,7 @@ const TptEdge = memo((props: EdgeProps) => {
 const nodeTypes = { metabolite:MetaboliteNode, process:ProcessNode, enzyme:EnzymeNode, transport:TransportNode, compartment:CompartmentNode }
 const edgeTypes = { reaction:ReactionEdge, regulatory:RegulatoryEdge, reversible:BidirectionalEdge, tpt:TptEdge }
 
-const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:52},draggable:false })
+const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:58},draggable:false })
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
 const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92) => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity},style:{width,height:38},draggable:false })
 const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:14,height:14}:undefined,selectable:false })
@@ -191,7 +191,7 @@ function makeElements(b:Balance,d:Derived) {
 
 export function MetabolicFlow({balance,derived}:Props){
   const {nodes,edges}=useMemo(()=>makeElements(balance,derived),[balance,derived])
-  return <div className="flow-stage"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.035}} minZoom={.45} maxZoom={1.8} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll zoomOnPinch zoomOnScroll>
+  return <div className="flow-stage"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{padding:.015,minZoom:.68,maxZoom:1.15}} minZoom={.6} maxZoom={2.2} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnScroll zoomOnPinch zoomOnScroll>
     <Background color="#dfe6dc" gap={24} size={1}/><Controls showInteractive={false}/>
   </ReactFlow></div>
 }

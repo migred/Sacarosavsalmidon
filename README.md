@@ -1,5 +1,7 @@
 # Destino del carbono · React Flow
 
+Versión 1.0.1: revisión de legibilidad para visualización al 100 % en el navegador. Aumenta la tipografía de controles, metabolitos, enzimas, leyendas e interpretación; amplía el panel lateral y el lienzo; y evita que el ajuste inicial de React Flow reduzca excesivamente el mapa.
+
 Aplicación didáctica interactiva para estudiar la partición del carbono fotosintético entre sacarosa y almidón. El mapa se representa con React Flow y componentes bioquímicos propios.
 
 ## Ejecutar
@@ -21,9 +23,15 @@ La carpeta `dist/` puede publicarse directamente. El proyecto utiliza rutas rela
 
 El proyecto incluye un flujo de GitHub Actions. En el repositorio, selecciona **Settings → Pages → Source → GitHub Actions** y sube el contenido a la rama `main`. Cada cambio en `main` volverá a compilar y publicar la aplicación.
 
-## Interacción
+## Interacción y balances
 
-Los cinco deslizadores controlan la salida de sacarosa y los balances Pi/triosas-P de citosol y estroma. Los dos pares Pi/triosas-P son inversos y suman siempre 100 %. Cada cambio actualiza:
+Los cinco deslizadores representan condiciones externas: fijación de carbono, demanda del floema, tamaño del depósito de fosfato intercambiable, distribución del Pi libre y capacidad del TPT. Las concentraciones internas se calculan como resultados del modelo.
+
+El fosfato intercambiable se distribuye entre Pi citosólico, Pi estromático, triosas-P citosólicas y triosas-P estromáticas. Sus fracciones suman siempre el 100 %. El TPT mueve una triosa-P y un Pi en sentidos opuestos, sin crear ni destruir fosfato.
+
+El carbono fijado se reparte entre sacarosa exportada, almidón almacenado y carbono soluble retenido. Estas tres fracciones también se normalizan para sumar el 100 % del carbono entrante. La salida al floema se trata como demanda o flujo, no como concentración; el depósito interno de sacarosa se calcula por separado.
+
+Cada cambio actualiza:
 
 - el color y porcentaje de los metabolitos;
 - la actividad de las enzimas;
@@ -31,7 +39,7 @@ Los cinco deslizadores controlan la salida de sacarosa y los balances Pi/triosas
 - las activaciones e inhibiciones dependientes de umbrales;
 - la dirección neta del antiporte TPT, representado mediante dos únicas flechas continuas y opuestas: una para triosas-P y otra para Pi.
 
-La sección **Casos fisiológicos** incorpora seis estados predefinidos: equilibrio basal, exportación sostenida al floema, interrupción de la exportación, acumulación de Pi citosólico, acumulación de Pi estromático y abundancia de carbono estromático. Al modificar manualmente cualquier deslizador se activa la exploración libre.
+La sección **Casos fisiológicos** incorpora seis estados predefinidos: equilibrio basal, exportación sostenida al floema, interrupción de la exportación, acumulación de Pi citosólico, acumulación de Pi estromático y fijación alta con baja demanda del sumidero. Al modificar manualmente cualquier deslizador se activa la exploración libre.
 
 El mapa separa los compartimentos citosólico y cloroplástico. Las etapas dirigidas se dibujan como metabolito → proceso → metabolito; en las interconversiones, la enzima aparece junto a las flechas antiparalelas. Las activaciones terminan en punta de flecha verde y las inhibiciones en barra perpendicular roja.
 
@@ -41,4 +49,4 @@ Las regulaciones de largo alcance se conducen por corredores exteriores al mapa 
 
 ## Alcance científico
 
-El modelo utiliza unidades relativas. F2,6BP se calcula mediante un balance simplificado entre F6P-2-quinasa y F2,6BPasa, considerando F6P, Pi y triosas-P. El aumento de triosas-P citosólicas no reduce directamente F2,6BP. La aplicación es un recurso didáctico, no un modelo cinético calibrado experimentalmente.
+El modelo utiliza unidades relativas y representa un estado estacionario didáctico. Conserva dos presupuestos normalizados —fosfato intercambiable y carbono fijado—, pero no incluye ATP/ADP, PPi, respiración, fotorespiración ni todos los azúcares fosfato. F2,6BP se calcula mediante un balance simplificado entre F6P-2-quinasa y F2,6BPasa. La aplicación no es un modelo cinético calibrado experimentalmente.
