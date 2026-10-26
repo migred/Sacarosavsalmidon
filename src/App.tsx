@@ -186,7 +186,7 @@ export default function App(){
         <div className="map-card">
           <div className="map-title"><div><span>MAPA BIOQUÍMICO INTERACTIVO</span><h1>Partición del carbono fotosintético</h1></div><div className="map-legend"><i className="low"/>Bajo<i className="normal"/>Medio<i className="high"/>Alto<i className="critical"/>Umbral</div></div>
           <MetabolicFlow balance={balance} derived={d}/>
-          <div className="sbgn-key"><span><b>□</b> metabolito</span><span><b>○</b> proceso</span><span><b>→</b> dirigida</span><span><b>⇄</b> reversible</span><span><b>⊣</b> inhibición</span><span><b>△</b> activación</span></div>
+          <div className="sbgn-key"><span><b>□</b> metabolito</span><span><b>○</b> proceso</span><span><b>→</b> dirigida</span><span><b>⇄</b> reversible</span><span><b>⊣</b> inhibición</span><span><b>△</b> activación</span><span><b>Enzima:</b> rojo baja · ámbar media · verde alta</span></div>
         </div>
         <div className="interpretation"><Info/><div><b>Respuesta regulatoria</b><p>{d.sucrosePool>=70?'La sacarosa acumulada ejerce retroinhibición sobre SPS. ':d.sps<25?'La síntesis de sacarosa está limitada por sustrato o por Pi. ':'SPS conserva capacidad para sostener la síntesis de sacarosa. '}{balance.piCyt>=65?'El Pi citosólico alto inhibe SPS y modifica el balance F6P-2-quinasa/F2,6BPasa. ':''}{balance.piStroma>=65?'El Pi estromático reduce la relación 3-PGA/Pi e inhibe AGPasa. ':d.agpase>=70?'La relación carbono/Pi activa AGPasa y favorece el almidón. ':'AGPasa responde al balance carbono/Pi. '}El TPT intercambia una triosa-P por un Pi, sin cambiar el fosfato total.</p></div></div>
       </section>

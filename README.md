@@ -1,6 +1,6 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.3: revisión de legibilidad, regulación y antiporte TPT. El transportador se aplica como una redistribución estequiométrica real: cada triosa-P transportada obliga al movimiento de un Pi de igual magnitud en sentido contrario.
+Versión 1.0.4: revisión de legibilidad, regulación y antiporte TPT. Las tarjetas enzimáticas muestran el nombre y la actividad en filas separadas, cambian de color según su intervalo de actividad y las conexiones regulatorias varían su grosor según la intensidad de la señal.
 
 > Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
 

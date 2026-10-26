@@ -7,9 +7,10 @@ import '@xyflow/react/dist/style.css'
 import type { Balance, Derived } from './App'
 
 type Props = { balance: Balance; derived: Derived }
-type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'; corridor?: number; waypoints?: {x:number;y:number}[] }
+type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'; corridor?: number; waypoints?: {x:number;y:number}[] }
 
 const level = (v = 0) => v < 25 ? 'low' : v < 65 ? 'normal' : v < 82 ? 'high' : 'critical'
+const clamp = (v:number) => Math.max(0,Math.min(100,v))
 
 function FourHandles() {
   return <>
@@ -32,7 +33,9 @@ const ProcessNode = memo(({ data }: NodeProps) => {
 
 const EnzymeNode = memo(({ data }: NodeProps) => {
   const d = data as FlowData
-  return <div className={`enzyme-node ${(d.activity ?? 0) < 25 ? 'limited' : ''}`}><FourHandles /><b>{d.label}</b><span>actividad {Math.round(d.activity ?? 0)}%</span><i><em style={{ width:`${d.activity ?? 0}%` }} /></i></div>
+  const activity=d.activity??0
+  const activityClass=activity<25?'activity-low':activity<55?'activity-medium':activity<80?'activity-high':'activity-very-high'
+  return <div className={`enzyme-node ${activityClass}`}><FourHandles /><b>{d.label}</b><span>Actividad {Math.round(activity)}%</span><i><em style={{ width:`${activity}%` }} /></i></div>
 })
 
 const TransportNode = memo(({ data }: NodeProps) => {
@@ -54,25 +57,31 @@ const ReactionEdge = memo((props: EdgeProps) => {
 
 const RegulatoryEdge = memo((props: EdgeProps) => {
   const d = props.data as FlowData | undefined
-  const [curve] = getBezierPath(props)
-  const waypointPath = d?.waypoints?.length ? `M ${props.sourceX} ${props.sourceY} ${d.waypoints.map(p=>`L ${p.x} ${p.y}`).join(' ')} L ${props.targetX} ${props.targetY}` : undefined
+  const kind = d?.kind ?? 'activation'
+  const endpointGap=kind==='catalysis'?0:8
+  const endX=props.targetX+(props.targetPosition===Position.Left?-endpointGap:props.targetPosition===Position.Right?endpointGap:0)
+  const endY=props.targetY+(props.targetPosition===Position.Top?-endpointGap:props.targetPosition===Position.Bottom?endpointGap:0)
+  const [curve] = getBezierPath({sourceX:props.sourceX,sourceY:props.sourceY,targetX:endX,targetY:endY,sourcePosition:props.sourcePosition,targetPosition:props.targetPosition})
+  const waypointPath = d?.waypoints?.length ? `M ${props.sourceX} ${props.sourceY} ${d.waypoints.map(p=>`L ${p.x} ${p.y}`).join(' ')} L ${endX} ${endY}` : undefined
   const path = waypointPath ?? (d?.route === 'left' || d?.route === 'right'
-    ? `M ${props.sourceX} ${props.sourceY} L ${d.corridor} ${props.sourceY} L ${d.corridor} ${props.targetY} L ${props.targetX} ${props.targetY}`
+    ? `M ${props.sourceX} ${props.sourceY} L ${d.corridor} ${props.sourceY} L ${d.corridor} ${endY} L ${endX} ${endY}`
     : d?.route === 'top' || d?.route === 'bottom'
-      ? `M ${props.sourceX} ${props.sourceY} L ${props.sourceX} ${d.corridor} L ${props.targetX} ${d.corridor} L ${props.targetX} ${props.targetY}`
+      ? `M ${props.sourceX} ${props.sourceY} L ${props.sourceX} ${d.corridor} L ${endX} ${d.corridor} L ${endX} ${endY}`
       : curve)
   const active = d?.active ?? false
-  const kind = d?.kind ?? 'activation'
-  const color = kind === 'inhibition' ? '#c3443a' : kind === 'catalysis' ? '#78649a' : '#3e8a58'
-  const opacity = active ? 1 : .14
+  const strength=clamp(d?.strength??(active?100:0))
+  const color = kind === 'inhibition' ? '#b72f2b' : kind === 'catalysis' ? '#70528f' : '#247c43'
+  const width=kind==='catalysis'?1.8+strength/65:2.4+strength/24
+  const opacity=active ? .78+strength/455 : .42+strength/555
   const verticalTarget = props.targetPosition === Position.Left || props.targetPosition === Position.Right
+  const barHalf=9+strength*.035
   const bar = kind === 'inhibition' && (verticalTarget
-    ? <line x1={props.targetX} y1={props.targetY-7} x2={props.targetX} y2={props.targetY+7} />
-    : <line x1={props.targetX-7} y1={props.targetY} x2={props.targetX+7} y2={props.targetY} />)
+    ? <line x1={endX} y1={endY-barHalf} x2={endX} y2={endY+barHalf} />
+    : <line x1={endX-barHalf} y1={endY} x2={endX+barHalf} y2={endY} />)
   return <g className={`reg-edge ${kind}`} style={{ opacity }}>
-    <BaseEdge path={path} markerEnd={kind === 'activation' ? props.markerEnd : undefined} style={{ stroke:color, strokeWidth:active?2.2:1.2, strokeDasharray:kind==='catalysis'?'4 3':undefined }} />
-    {bar && <g stroke={color} strokeWidth="2.5">{bar}</g>}
-    {kind === 'catalysis' && <circle cx={props.targetX} cy={props.targetY} r="4" fill="white" stroke={color} strokeWidth="2" />}
+    <BaseEdge path={path} markerEnd={kind === 'activation' ? props.markerEnd : undefined} style={{ stroke:color, strokeWidth:width, strokeDasharray:kind==='catalysis'?'5 3':undefined }} />
+    {bar && <g stroke={color} strokeWidth={Math.max(3,width)}>{bar}</g>}
+    {kind === 'catalysis' && <circle cx={endX} cy={endY} r="4.5" fill="white" stroke={color} strokeWidth="2.5" />}
   </g>
 })
 
@@ -110,7 +119,7 @@ const met = (id:string,label:string,value:number,parentId:string,x:number,y:numb
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
 const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38) => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity},style:{width,height},draggable:false })
 const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:14,height:14}:undefined,selectable:false })
-const regulation = (id:string,source:string,target:string,kind:'activation'|'inhibition'|'catalysis',active:boolean,sourceHandle:string,targetHandle:string,route?:FlowData['route'],corridor?:number,waypoints?:FlowData['waypoints']) => ({ id,type:'regulatory',source,target,sourceHandle,targetHandle,data:{kind,active,route,corridor,waypoints},markerEnd:kind==='activation'?{type:MarkerType.ArrowClosed,color:'#3e8a58',width:14,height:14}:undefined,selectable:false })
+const regulation = (id:string,source:string,target:string,kind:'activation'|'inhibition'|'catalysis',active:boolean,strength:number,sourceHandle:string,targetHandle:string,route?:FlowData['route'],corridor?:number,waypoints?:FlowData['waypoints']) => ({ id,type:'regulatory',source,target,sourceHandle,targetHandle,data:{kind,active,strength,route,corridor,waypoints},markerEnd:kind==='activation'?{type:MarkerType.ArrowClosed,color:'#247c43',width:16+strength*.05,height:16+strength*.05}:undefined,selectable:false })
 const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:13,height:13},selectable:false })
 const transport = (id:string,source:string,target:string,kind:'pi'|'triose',flux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'tpt',source,target,sourceHandle,targetHandle,data:{kind,flux},markerEnd:{type:MarkerType.ArrowClosed,color:kind==='pi'?'#477eb2':'#ad772b',width:17,height:17},selectable:false })
 
@@ -160,22 +169,22 @@ function makeElements(b:Balance,d:Derived) {
     reversible('bi_ald_s','trioses','f16s',b.trioseStroma*.72,b.trioseStroma*.28,'s-right','t-left'),
     reaction('r_pga','pga','trioses',b.trioseStroma,'s-left','t-right',true),
 
-    regulation('cat_spp','e_spp','p_spp','catalysis',true,'s-left','t-right'),regulation('cat_sps','e_sps','p_sps','catalysis',true,'s-left','t-right'),
-    regulation('cat_fbp','e_fbp','p_fbp','catalysis',true,'s-left','t-right'),
-    regulation('cat_starch','e_starch','p_starch','catalysis',true,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,'s-left','t-right'),
-    regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,'s-left','t-right'),
+    regulation('cat_spp','e_spp','p_spp','catalysis',true,d.sucroseFlux,'s-left','t-right'),regulation('cat_sps','e_sps','p_sps','catalysis',true,d.sps,'s-left','t-right'),
+    regulation('cat_fbp','e_fbp','p_fbp','catalysis',true,d.fbpase,'s-left','t-right'),
+    regulation('cat_starch','e_starch','p_starch','catalysis',true,d.starchFlux,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,d.agpase,'s-left','t-right'),
+    regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,b.trioseStroma,'s-left','t-right'),
 
-    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,'s-left','t-right',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:440,y:510},{x:440,y:408}]),
-    regulation('reg_pi_sps','pic','e_sps','inhibition',b.piCyt>=65,'s-right','t-right','right',610),
-    regulation('reg_g6_sps','g6c','e_sps','activation',d.g6p>=30,'s-bottom','t-right',undefined,undefined,[{x:362,y:400},{x:610,y:400},{x:610,y:193}]),
-    regulation('reg_suc_sps','sucrose','e_sps','inhibition',d.sucrosePool>=70,'s-right','t-right','right',610),
-    regulation('reg_pi_f26k','pic','e_f26k','activation',b.piCyt>=55,'s-left','t-left','left',10),
-    regulation('reg_tri_f26k','triosec','e_f26k','inhibition',b.trioseCyt>=65,'s-left','t-left','left',10),
-    regulation('reg_pi_f26b','pic','e_f26b','inhibition',b.piCyt>=55,'s-left','t-left','left',10),
-    regulation('reg_f6_f26k','f6c','e_f26k','activation',d.f6p>=35,'s-top','t-right',undefined,undefined,[{x:232,y:245},{x:220,y:245},{x:220,y:281}]),
-    regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,'s-bottom','t-right',undefined,undefined,[{x:220,y:393},{x:220,y:428}]),
-    regulation('reg_pi_agp','pis','e_agp','inhibition',b.piStroma>=65,'s-right','t-right','right',1130),
-    regulation('reg_pga_agp','pga','e_agp','activation',b.trioseStroma>=30,'s-right','t-right','right',1130),
+    regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=68,d.f26bp,'s-left','t-right',undefined,undefined,[{x:10,y:364},{x:10,y:510},{x:440,y:510},{x:440,y:408}]),
+    regulation('reg_pi_sps','pic','e_sps','inhibition',b.piCyt>=65,b.piCyt,'s-right','t-right','right',610),
+    regulation('reg_g6_sps','g6c','e_sps','activation',d.g6p>=30,d.g6p,'s-bottom','t-right',undefined,undefined,[{x:362,y:400},{x:610,y:400},{x:610,y:193}]),
+    regulation('reg_suc_sps','sucrose','e_sps','inhibition',d.sucrosePool>=70,d.sucrosePool,'s-right','t-right','right',610),
+    regulation('reg_pi_f26k','pic','e_f26k','activation',b.piCyt>=55,b.piCyt,'s-left','t-left','left',10),
+    regulation('reg_tri_f26k','triosec','e_f26k','inhibition',b.trioseCyt>=65,b.trioseCyt,'s-left','t-left','left',10),
+    regulation('reg_pi_f26b','pic','e_f26b','inhibition',b.piCyt>=55,b.piCyt,'s-left','t-left','left',10),
+    regulation('reg_f6_f26k','f6c','e_f26k','activation',d.f6p>=35,d.f6p,'s-top','t-right',undefined,undefined,[{x:232,y:245},{x:220,y:245},{x:220,y:281}]),
+    regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-right',undefined,undefined,[{x:220,y:393},{x:220,y:428}]),
+    regulation('reg_pi_agp','pis','e_agp','inhibition',b.piStroma>=65,b.piStroma,'s-right','t-right','right',1130),
+    regulation('reg_pga_agp','pga','e_agp','activation',b.trioseStroma>=30,Math.min(100,b.trioseStroma*1.25),'s-right','t-right','right',1130),
   ]
   if(d.tpt>=0){
     edges.push(
