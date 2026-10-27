@@ -1,10 +1,8 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.11: amplía y recoloca las réplicas locales de Pi, mantiene siempre visible su conexión correcta con la enzima correspondiente, desvía la regulación F2,6BP→FBPasa para que no atraviese la aldolasa y exagera deliberadamente la respuesta de F2,6BP para facilitar su interpretación didáctica.
+Versión 1.0.12: sustituye los controles continuos por casos fisiológicos, traslada el selector al lateral, representa las concentraciones mediante flechas cualitativas e incorpora la degradación nocturna del almidón con maltosa y glucosa.
 
-> Nota: el activador de la sacarosa-fosfato sintasa mostrado en el esquema es G6P (glucosa-6-fosfato), no G1P.
-
-Aplicación didáctica interactiva para estudiar la partición del carbono fotosintético entre sacarosa y almidón. El mapa se representa con React Flow y componentes bioquímicos propios.
+Aplicación didáctica interactiva para estudiar la partición del carbono entre sacarosa y almidón. El mapa utiliza React Flow y un modelo continuo interno de regulación metabólica.
 
 ## Ejecutar
 
@@ -23,48 +21,50 @@ La carpeta `dist/` puede publicarse directamente. El proyecto utiliza rutas rela
 
 ### GitHub Pages
 
-El proyecto incluye un flujo de GitHub Actions. En el repositorio, selecciona **Settings → Pages → Source → GitHub Actions** y sube el contenido a la rama `main`. Cada cambio en `main` volverá a compilar y publicar la aplicación.
+El proyecto incluye un flujo de GitHub Actions. En el repositorio, selecciona **Settings → Pages → Source → GitHub Actions** y sube el contenido a la rama `main`.
 
-## Interacción y balances
+## Casos fisiológicos
 
-Los cuatro deslizadores representan la carga floemática, el tamaño del depósito de fosfato intercambiable, la cuota celular de Pi citosólico y las triosas-P citosólicas. La fijación de CO₂ no se ajusta: se mantiene constante en los escenarios diurnos. Al reducir la carga floemática se acumula sacarosa y aumenta su retroinhibición sobre SPS.
+No hay deslizadores ni modo de exploración libre. El lateral permite escoger:
 
-El fosfato intercambiable se distribuye entre Pi citosólico, Pi estromático, triosas-P citosólicas y triosas-P estromáticas. Sus fracciones suman siempre el 100 %. Al aumentar la cuota de Pi citosólico disminuyen simultáneamente las otras tres fracciones. El TPT mueve una triosa-P y un Pi en sentidos opuestos, sin crear ni destruir fosfato.
+- día con carga floemática normal, alta, baja o cerrada;
+- noche temprana o avanzada;
+- limitación de Pi.
 
-El control de triosa-P citosólica modifica el reparto inicial entre ambos compartimentos. Después, el TPT recalcula conjuntamente las cuatro fracciones: una acumulación suficiente de TP en el citosol favorece su retorno al estroma y la entrada compensatoria de Pi al citosol.
+Cada caso fija internamente iluminación, carga floemática, depósito de fosfato, distribución inicial de Pi y triosas-P, y reserva de almidón. El cálculo sigue siendo cuantitativo y continuo, pero la concentración visible se compara con el día basal y se traduce a cinco categorías:
 
-La dirección del TPT se obtiene del desequilibrio `TPest·Picit − TPcit·Piest`. Una extensión positiva exporta triosa-P al citosol e introduce Pi en el estroma; una extensión negativa realiza el intercambio contrario. No existe un control manual de velocidad: el intercambio se orienta automáticamente y queda limitado únicamente por los sustratos disponibles. Después del transporte se recalculan todas las concentraciones y actividades enzimáticas.
+- `↓↓`: muy baja (≤55 % de la referencia);
+- `↓`: baja (56–80 %);
+- sin flecha: normal (81–120 %);
+- `↑`: alta (121–160 %);
+- `↑↑`: muy alta (>160 %).
 
-El lienzo no captura el desplazamiento vertical en su vista completa. El desplazamiento y arrastre se activan únicamente después de ampliar el mapa mediante los controles de zoom o un gesto de pellizco.
+Las actividades enzimáticas conservan una escala continua de 0–100 %, con color y barra. Las reacciones favorecidas aumentan de grosor; las casi bloqueadas se muestran finas y discontinuas.
+
+## Día, noche y reservas
+
+Durante el día existe producción de fotoasimilados. Al disminuir la carga floemática se acumula sacarosa, aumenta su retroinhibición sobre SPS y cambia el reparto hacia la reserva.
+
+Durante la noche la fijación de CO₂ es cero. El suministro procede de la degradación del almidón y se representa mediante maltosa y glucosa. La noche temprana conserva una reserva y un flujo de movilización altos; en la noche avanzada ambos disminuyen.
+
+## Fosfato y TPT
+
+El fosfato intercambiable se distribuye entre Pi citosólico, Pi estromático, triosas-P citosólicas y triosas-P estromáticas. Sus fracciones internas suman el 100 %. El TPT intercambia una triosa-P y un Pi en sentidos opuestos, sin control manual de velocidad y sin crear ni destruir fosfato.
+
+La dirección se calcula a partir del desequilibrio `TPest·Picit − TPcit·Piest`. Una extensión positiva exporta triosa-P al citosol e introduce Pi en el estroma; una negativa invierte ambos movimientos.
+
+El Pi se repite como nodos locales junto a SPS, F6P-2-quinasa, F2,6BPasa y AGPasa. Son alias gráficos sincronizados, no depósitos adicionales. Los globos se han ampliado y usan la misma flecha cualitativa que el nodo principal.
+
+## Regulación y lectura
+
+Pi, G6P, F2,6BP, sacarosa, triosas-P y 3-PGA modifican continuamente las actividades enzimáticas. Cuando dos reguladores ejercen efectos antagónicos, el mapa destaca la señal dominante. Al pasar el cursor por una enzima aparece una explicación cualitativa de por qué está activa, limitada o reprimida.
+
+La respuesta de F2,6BP está deliberadamente exagerada como recurso didáctico. El lienzo no captura el desplazamiento vertical en la vista completa; se activa al ampliar el mapa.
 
 ## Referencia experimental
 
-La interfaz incluye valores de Szecowka et al. (2013, *The Plant Cell*, DOI `10.1105/tpc.112.106989`), obtenidos mediante marcaje de rosetas iluminadas con 13CO₂: síntesis de sacarosa de 7,11 y de almidón de 3,19 nmol de C g⁻¹ de peso fresco s⁻¹, relación 2,2:1; DHAP de 2,7 ± 0,6 nmol g⁻¹, distribuido 77 % en citosol y 23 % en plastidio. El estudio trata DHAP y 3-PGA de ambos compartimentos como depósitos en rápido equilibrio isotópico por el TPT, pero no ofrece un único flujo neto de TPT directamente utilizable para calibrar este simulador.
-
-El carbono fijado se reparte entre sacarosa exportada, almidón almacenado y carbono soluble retenido. Estas tres fracciones también se normalizan para sumar el 100 % del carbono entrante. La salida al floema se trata como demanda o flujo, no como concentración; el depósito interno de sacarosa se calcula por separado.
-
-Cada cambio actualiza:
-
-- el color y porcentaje de los metabolitos;
-- la actividad de las enzimas;
-- el grosor de los flujos metabólicos;
-- las activaciones e inhibiciones dependientes de umbrales;
-- la dirección neta del antiporte TPT, representado mediante dos únicas flechas continuas y opuestas: una para triosas-P y otra para Pi.
-
-Para evitar interpretar como simultáneamente dominantes señales opuestas, SPS, F6P-2-quinasa y AGPasa destacan la línea de mayor intensidad relativa, ponderada por el coeficiente o umbral con el que actúa en el modelo. El regulador dominante puede cambiar al mover un deslizador o seleccionar otro escenario. Como excepción visual, las conexiones locales del Pi se mantienen siempre visibles para identificar la función de cada réplica; se muestran más tenues cuando no son dominantes.
-
-La sección **Casos fisiológicos** incorpora siete estados predefinidos: día basal, carga floemática alta, cierre de carga, noche, Pi alto en citosol, Pi bajo en citosol y acumulación de triosas-P. Al modificar manualmente cualquier deslizador se activa la exploración libre.
-
-El mapa separa los compartimentos citosólico y cloroplástico. Las etapas dirigidas se dibujan como metabolito → proceso → metabolito; en las interconversiones, la enzima aparece junto a las flechas antiparalelas. Las activaciones terminan en punta de flecha verde y las inhibiciones en barra perpendicular roja.
-
-Las interconversiones mediante PGI, PGM, UGPasa y aldolasa se representan mediante dos flechas antiparalelas. Sus grosores independientes muestran la preferencia relativa de cada sentido. El ciclo F6P/F2,6BP también utiliza dos flechas porque la síntesis y la hidrólisis dependen de enzimas diferentes. Las etapas SPS, SPP, FBPasa, AGPasa y formación de almidón permanecen dirigidas.
-
-Las regulaciones de largo alcance se conducen por corredores exteriores al mapa metabólico para evitar atravesar metabolitos o enzimas. Cada activador o inhibidor llega a un puerto distinto de la tarjeta enzimática; un halo claro separa cruces y mantiene visibles las puntas de activación y las barras de inhibición.
-
-El Pi se repite como nodos locales junto a SPS, F6P-2-quinasa, F2,6BPasa y AGPasa. Estas copias son alias gráficos sincronizados, no depósitos adicionales: el Pi sólo se contabiliza una vez en cada compartimento. Los nodos grandes inferiores se reservan para representar el intercambio del TPT. Pi activa F6P-2-quinasa, mientras que inhibe SPS, F2,6BPasa y AGPasa.
-
-La relación entre la actividad de F6P-2-quinasa, F2,6BPasa y la concentración de F2,6BP se ha hecho deliberadamente más intensa y de tipo interruptor, sin pretender una respuesta fisiológica calibrada. El objetivo es que el regulador pase claramente entre estados bajo y alto y que su inhibición de FBPasa sea visible durante la exploración.
+La interfaz conserva los valores de Szecowka et al. (2013, *The Plant Cell*, DOI `10.1105/tpc.112.106989`), obtenidos mediante marcaje de rosetas iluminadas con 13CO₂: síntesis de sacarosa de 7,11 y de almidón de 3,19 nmol de C g⁻¹ de peso fresco s⁻¹, relación 2,2:1; DHAP distribuido 77 % en citosol y 23 % en plastidio.
 
 ## Alcance científico
 
-El modelo utiliza unidades relativas y representa un estado estacionario didáctico. Conserva dos presupuestos normalizados —fosfato intercambiable y carbono fijado—, pero no incluye ATP/ADP, PPi, respiración, fotorespiración ni todos los azúcares fosfato. F2,6BP se calcula mediante un balance simplificado entre F6P-2-quinasa y F2,6BPasa. La aplicación no es un modelo cinético calibrado experimentalmente.
+El modelo usa unidades relativas y estados estacionarios didácticos. No incluye ATP/ADP, PPi, respiración, fotorespiración ni todos los azúcares fosfato. No es un modelo cinético calibrado y las flechas expresan cambios relativos, no concentraciones absolutas.

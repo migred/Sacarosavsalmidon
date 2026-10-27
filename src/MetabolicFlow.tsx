@@ -4,15 +4,25 @@ import {
   getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps, type Node, type NodeProps, type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { Balance, Derived } from './App'
+import type { Balance, Derived, Model } from './App'
 
-type Props = { balance: Balance; derived: Derived }
+type Props = { balance: Balance; derived: Derived; baseline: Model }
 type RegulationReason = { kind:'activation'|'inhibition'|'context'; text:string }
-type FlowData = { label: string; value?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'|'elbow'; corridor?: number; waypoints?: {x:number;y:number}[]; reasons?: RegulationReason[]; tooltipSide?:'above'|'below' }
+type Trend = 'very-low'|'low'|'normal'|'high'|'very-high'
+type FlowData = { label: string; value?: number; reference?: number; activity?: number; compartment?: 'cytosol' | 'chloroplast'; note?: string; tone?: string; kind?: string; active?: boolean; strength?: number; flux?: number; production?: boolean; forwardFlux?: number; reverseFlux?: number; route?: 'left'|'right'|'top'|'bottom'|'elbow'; corridor?: number; waypoints?: {x:number;y:number}[]; reasons?: RegulationReason[]; tooltipSide?:'above'|'below' }
 type EnzymePopover = { x:number; y:number; side:'left'|'right'; label:string; activity:number; reasons:RegulationReason[] }
 
-const level = (v = 0) => v < 25 ? 'low' : v < 65 ? 'normal' : v < 82 ? 'high' : 'critical'
 const clamp = (v:number) => Math.max(0,Math.min(100,v))
+const trend=(value=0,reference=0):Trend=>{
+  if(reference<=2){
+    if(value<=2)return 'normal'
+    return value<=45?'high':'very-high'
+  }
+  const ratio=value/reference
+  return ratio<=.55?'very-low':ratio<=.80?'low':ratio<=1.20?'normal':ratio<=1.60?'high':'very-high'
+}
+const trendArrow=(state:Trend)=>state==='very-low'?'↓↓':state==='low'?'↓':state==='high'?'↑':state==='very-high'?'↑↑':''
+const trendWord=(state:Trend)=>state==='very-low'?'muy baja':state==='low'?'baja':state==='high'?'alta':state==='very-high'?'muy alta':'normal'
 
 function FourHandles() {
   return <>
@@ -37,12 +47,14 @@ function EnzymeHandles(){
 
 const MetaboliteNode = memo(({ data }: NodeProps) => {
   const d = data as FlowData
-  return <div className={`metabolite-node ${level(d.value)}`}><FourHandles /><b>{d.label}</b><strong>{Math.round(d.value ?? 0)}%</strong>{d.note && <small>{d.note}</small>}</div>
+  const state=trend(d.value,d.reference)
+  return <div className={`metabolite-node ${state}`} title={`${d.label}: concentración ${trendWord(state)}`}><FourHandles /><b>{d.label}</b><strong>{trendArrow(state)||<span className="normal-word">normal</span>}</strong>{d.note && <small>{d.note}</small>}</div>
 })
 
 const PiAliasNode = memo(({data}:NodeProps)=>{
   const d=data as FlowData
-  return <div className={`pi-alias ${level(d.value)}`} title={`Pi ${Math.round(d.value??0)}% · réplica visual del mismo depósito`}><FourHandles/><b>Pi</b><small>{Math.round(d.value??0)}%</small></div>
+  const state=trend(d.value,d.reference)
+  return <div className={`pi-alias ${state}`} title={`Pi: concentración ${trendWord(state)} · réplica visual del mismo depósito`}><FourHandles/><b>Pi</b><small>{trendArrow(state)||'normal'}</small></div>
 })
 
 const ProcessNode = memo(({ data }: NodeProps) => {
@@ -73,8 +85,10 @@ const CompartmentNode = memo(({ data }: NodeProps) => {
 const ReactionEdge = memo((props: EdgeProps) => {
   const d = props.data as FlowData | undefined
   const [path] = getSmoothStepPath(props)
-  const width = .9 + (d?.flux ?? 0) / 28
-  return <BaseEdge path={path} markerEnd={props.markerEnd} style={{ stroke:'#435b4e', strokeWidth:width, opacity:.82 }} />
+  const flux=d?.flux??0
+  const blocked=flux<6
+  const width = blocked?.75:1.25+flux/22
+  return <BaseEdge path={path} markerEnd={props.markerEnd} style={{ stroke:'#435b4e', strokeWidth:width, strokeDasharray:blocked?'4 5':undefined, opacity:blocked?.35:.86 }} />
 })
 
 const RegulatoryEdge = memo((props: EdgeProps) => {
@@ -124,9 +138,11 @@ const BidirectionalEdge = memo((props: EdgeProps) => {
     ? `M ${props.targetX} ${props.targetY-5} L ${cornerX-5} ${props.targetY-5} L ${cornerX-5} ${props.sourceY-5} L ${props.sourceX} ${props.sourceY-5}`
     : `M ${props.targetX-nx} ${props.targetY-ny} L ${props.sourceX-nx} ${props.sourceY-ny}`
   const width = (flux=0) => .9 + flux / 22
+  const forwardBlocked=(d?.forwardFlux??0)<6
+  const reverseBlocked=(d?.reverseFlux??0)<6
   return <g className="bidirectional-edge">
-    <BaseEdge path={forward} markerEnd={props.markerEnd} style={{stroke:'#435b4e',strokeWidth:width(d?.forwardFlux),opacity:.88}} />
-    <BaseEdge path={reverse} markerEnd={props.markerEnd} style={{stroke:'#87968d',strokeWidth:width(d?.reverseFlux),opacity:.78}} />
+    <BaseEdge path={forward} markerEnd={props.markerEnd} style={{stroke:'#435b4e',strokeWidth:forwardBlocked?.75:width(d?.forwardFlux),strokeDasharray:forwardBlocked?'4 5':undefined,opacity:forwardBlocked?.3:.88}} />
+    <BaseEdge path={reverse} markerEnd={props.markerEnd} style={{stroke:'#87968d',strokeWidth:reverseBlocked?.75:width(d?.reverseFlux),strokeDasharray:reverseBlocked?'4 5':undefined,opacity:reverseBlocked?.3:.78}} />
   </g>
 })
 
@@ -145,7 +161,7 @@ const nodeTypes = { metabolite:MetaboliteNode, piAlias:PiAliasNode, process:Proc
 const edgeTypes = { reaction:ReactionEdge, regulatory:RegulatoryEdge, reversible:BidirectionalEdge, tpt:TptEdge }
 
 const met = (id:string,label:string,value:number,parentId:string,x:number,y:number,note?:string,width=104) => ({ id,type:'metabolite',parentId,extent:'parent' as const,position:{x,y},data:{label,value,note},style:{width,height:58},draggable:false })
-const piAlias=(id:string,value:number,parentId:string,x:number,y:number)=>({id,type:'piAlias',parentId,extent:'parent' as const,position:{x,y},data:{label:'Pi',value},style:{width:40,height:40},draggable:false,selectable:false})
+const piAlias=(id:string,value:number,parentId:string,x:number,y:number)=>({id,type:'piAlias',parentId,extent:'parent' as const,position:{x,y},data:{label:'Pi',value},style:{width:46,height:46},draggable:false,selectable:false})
 const proc = (id:string,label:string,parentId:string|undefined,x:number,y:number) => ({ id,type:'process',parentId,extent:parentId?'parent' as const:undefined,position:{x,y},data:{label},style:{width:18,height:18},draggable:false })
 const enz = (id:string,label:string,activity:number,parentId:string,x:number,y:number,width=92,height=38,reasons:RegulationReason[]=[],tooltipSide:'above'|'below'='above') => ({ id,type:'enzyme',parentId,extent:'parent' as const,position:{x,y},data:{label,activity,reasons,tooltipSide},style:{width,height},draggable:false })
 const reaction = (id:string,source:string,target:string,flux:number,sourceHandle:string,targetHandle:string,production=false) => ({ id,type:'reaction',source,target,sourceHandle,targetHandle,data:{flux,production},markerEnd:production?{type:MarkerType.ArrowClosed,color:'#435b4e',width:9,height:9}:undefined,selectable:false })
@@ -153,15 +169,14 @@ const regulation = (id:string,source:string,target:string,kind:'activation'|'inh
 const reversible = (id:string,source:string,target:string,forwardFlux:number,reverseFlux:number,sourceHandle:string,targetHandle:string,route?:'elbow') => ({ id,type:'reversible',source,target,sourceHandle,targetHandle,data:{forwardFlux,reverseFlux,route},markerEnd:{type:MarkerType.ArrowClosed,color:'#435b4e',width:8,height:8},selectable:false })
 const transport = (id:string,source:string,target:string,kind:'pi'|'triose',flux:number,sourceHandle:string,targetHandle:string) => ({ id,type:'tpt',source,target,sourceHandle,targetHandle,data:{kind,flux},markerEnd:{type:MarkerType.ArrowClosed,color:kind==='pi'?'#477eb2':'#ad772b',width:10,height:10},selectable:false })
 
-function makeElements(b:Balance,d:Derived) {
-  const pct=(value:number)=>`${Math.round(value)}%`
+function makeElements(b:Balance,d:Derived,baseline:Model) {
   const activator=(label:string,value:number,threshold=45):RegulationReason=>value>=threshold
-    ? {kind:'activation',text:`${label} elevado (${pct(value)}) favorece la actividad`}
-    : {kind:'context',text:`${label} bajo (${pct(value)}) aporta poca activación`}
+    ? {kind:'activation',text:`${label} elevado favorece la actividad`}
+    : {kind:'context',text:`${label} bajo aporta poca activación`}
   const inhibitor=(label:string,value:number,threshold=55):RegulationReason=>value>=threshold
-    ? {kind:'inhibition',text:`${label} acumulado (${pct(value)}) reprime la enzima`}
-    : {kind:'context',text:`${label} bajo (${pct(value)}) alivia la inhibición`}
-  const substrate=(label:string,value:number):RegulationReason=>({kind:'context',text:`Disponibilidad de ${label}: ${pct(value)}`})
+    ? {kind:'inhibition',text:`${label} acumulado reprime la enzima`}
+    : {kind:'context',text:`${label} bajo alivia la inhibición`}
+  const substrate=(label:string,value:number):RegulationReason=>({kind:'context',text:`Disponibilidad de ${label}: ${value<30?'baja':value>70?'alta':'intermedia'}`})
   const pga=Math.min(100,b.trioseStroma*1.25)
   const strongest=<T extends {strength:number},>(signals:T[])=>signals.reduce((winner,signal)=>signal.strength>winner.strength?signal:winner)
   const spsDominant=strongest([
@@ -200,14 +215,15 @@ function makeElements(b:Balance,d:Derived) {
     enz('e_f26k','Fructosa-6-fosfato 2-quinasa',d.f26Kinase,'cytosol',40,253,180,56,[activator('F6P',d.f6p,35),activator('Pi citosólico',b.piCyt,55),inhibitor('triosas-P citosólicas',b.trioseCyt,65),winner(f26kDominant.label)]),
     enz('e_f26b','Fructosa-2,6-bisfosfatasa',d.f26Bisphosphatase,'cytosol',35,402,175,52,[inhibitor('Pi citosólico',b.piCyt,55),inhibitor('F6P',d.f6p,35)]),
 
-    met('starch','Almidón',d.starch,'chloroplast',210,25,'reserva',112),met('adpg','ADP-glucosa',d.starchFlux,'chloroplast',210,115),
+    met('starch','Almidón',d.starch,'chloroplast',210,25,'reserva',112),met('adpg','ADP-glucosa',d.starchSynthesisFlux,'chloroplast',210,115),
+    met('maltose','Maltosa',d.maltose,'chloroplast',28,115,'degradación nocturna',112),met('glucose','Glucosa',d.glucose,'chloroplast',28,220,'degradación nocturna',112),
     met('g1s','G1P',b.trioseStroma*.58,'chloroplast',210,215),met('g6s','G6P',b.trioseStroma*.66,'chloroplast',210,305),
     met('f6s','F6P',b.trioseStroma*.76,'chloroplast',210,395),met('f16s','F1,6BP',b.trioseStroma*.86,'chloroplast',210,485),
     met('trioses','Triosas-P',b.trioseStroma,'chloroplast',25,520,'estroma'),met('pga','3-PGA',pga,'chloroplast',415,520),
     met('pis','Pi',b.piStroma,'chloroplast',10,615,'estroma · dentro'),
     piAlias('pis_agp',b.piStroma,'chloroplast',300,162),
     proc('p_starch','Almidón sintasa','chloroplast',253,90),proc('p_agp','ADP-glucosa pirofosforilasa','chloroplast',253,180),proc('p_fbp_s','Fructosa-1,6-bisfosfatasa','chloroplast',253,460),
-    enz('e_starch','Almidón sintasa',d.starchFlux,'chloroplast',370,70,150,48,[substrate('ADP-glucosa',d.starchFlux)],'below'),
+    enz('e_starch','Almidón sintasa',d.starchSynthesisFlux,'chloroplast',370,70,150,48,[substrate('ADP-glucosa',d.starchSynthesisFlux)],'below'),
     enz('e_agp','ADP-glucosa pirofosforilasa',d.agpase,'chloroplast',365,156,170,52,[activator('3-PGA',pga,40),inhibitor('Pi estromático',b.piStroma,55),winner(agpDominant.label)],'below'),
     enz('e_pgm_s','PGM',b.trioseStroma,'chloroplast',380,270,70,38,[substrate('G1P/G6P',b.trioseStroma*.66)]),
     enz('e_pgi_s','PGI',b.trioseStroma,'chloroplast',380,360,70,38,[substrate('G6P/F6P',b.trioseStroma*.76)]),
@@ -226,7 +242,8 @@ function makeElements(b:Balance,d:Derived) {
     reversible('bi_ald_c','triosec','f16c',b.trioseCyt*.7,b.trioseCyt*.3,'s-left','t-right','elbow'),
     reversible('bi_f26','f6c','f26',d.f26Kinase,d.f26Bisphosphatase,'s-left','t-right'),
 
-    reaction('r_starch1','adpg','p_starch',d.starchFlux,'s-top','t-bottom'),reaction('r_starch2','p_starch','starch',d.starchFlux,'s-top','t-bottom',true),
+    reaction('r_starch1','adpg','p_starch',d.starchSynthesisFlux,'s-top','t-bottom'),reaction('r_starch2','p_starch','starch',d.starchSynthesisFlux,'s-top','t-bottom',true),
+    reaction('r_starch_deg','starch','maltose',d.starchDegradationFlux,'s-left','t-top',true),reaction('r_maltose_glucose','maltose','glucose',d.starchDegradationFlux*.82,'s-bottom','t-top',true),
     reaction('r_agp1','g1s','p_agp',d.agpase,'s-top','t-bottom'),reaction('r_agp2','p_agp','adpg',d.agpase,'s-top','t-bottom',true),
     reversible('bi_pgm_s','g6s','g1s',b.trioseStroma*.62,b.trioseStroma*.38,'s-top','t-bottom'),
     reversible('bi_pgi_s','f6s','g6s',b.trioseStroma*.56,b.trioseStroma*.44,'s-top','t-bottom'),
@@ -236,7 +253,7 @@ function makeElements(b:Balance,d:Derived) {
 
     regulation('cat_spp','e_spp','p_spp','catalysis',true,d.sucroseFlux,'s-left','t-right'),regulation('cat_sps','e_sps','p_sps','catalysis',true,d.sps,'s-left','t-right'),
     regulation('cat_fbp','e_fbp','p_fbp','catalysis',true,d.fbpase,'s-left','t-right'),
-    regulation('cat_starch','e_starch','p_starch','catalysis',true,d.starchFlux,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,d.agpase,'s-left','t-right'),
+    regulation('cat_starch','e_starch','p_starch','catalysis',true,d.starchSynthesisFlux,'s-left','t-right'),regulation('cat_agp','e_agp','p_agp','catalysis',true,d.agpase,'s-left','t-right'),
     regulation('cat_fbp_s','e_fbp_s','p_fbp_s','catalysis',true,b.trioseStroma,'s-left','t-right'),
 
     regulation('reg_f26_fbp','f26','e_fbp','inhibition',d.f26bp>=55,d.f26bp,'s-left','t-reg-right-2',undefined,undefined,[{x:10,y:364},{x:10,y:540},{x:570,y:540},{x:570,y:408}]),
@@ -264,11 +281,17 @@ function makeElements(b:Balance,d:Derived) {
       transport('tpt_pi','pis','pic','pi',Math.abs(d.tpt),'s-left','t-right'),
     )
   }
+  const b0=baseline.balance, d0=baseline.derived
+  const references:Record<string,number>={
+    sucrose:d0.sucrosePool,s6p:d0.sucroseFlux,udp:d0.g6p*.55,g1c:d0.g6p*.62,g6c:d0.g6p,f6c:d0.f6p,f16c:b0.trioseCyt*.86,triosec:b0.trioseCyt,f26:d0.f26bp,pic:b0.piCyt,
+    pic_sps:b0.piCyt,pic_f26k:b0.piCyt,pic_f26b:b0.piCyt,starch:d0.starch,adpg:d0.starchSynthesisFlux,maltose:0,glucose:0,g1s:b0.trioseStroma*.58,g6s:b0.trioseStroma*.66,f6s:b0.trioseStroma*.76,f16s:b0.trioseStroma*.86,trioses:b0.trioseStroma,pga:Math.min(100,b0.trioseStroma*1.25),pis:b0.piStroma,pis_agp:b0.piStroma,
+  }
+  nodes.forEach(node=>{if(node.data&&typeof node.data.value==='number')node.data.reference=references[node.id]??node.data.value})
   return {nodes,edges}
 }
 
-export function MetabolicFlow({balance,derived}:Props){
-  const {nodes,edges}=useMemo(()=>makeElements(balance,derived),[balance,derived])
+export function MetabolicFlow({balance,derived,baseline}:Props){
+  const {nodes,edges}=useMemo(()=>makeElements(balance,derived,baseline),[balance,derived,baseline])
   const stageRef=useRef<HTMLDivElement>(null)
   const fittedZoom=useRef<number|null>(null)
   const [isZoomed,setIsZoomed]=useState(false)
