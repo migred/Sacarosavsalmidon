@@ -263,7 +263,8 @@ function makeElements(b:Balance,d:Derived,baseline:Model) {
     regulation('reg_pi_agp','pis_agp','e_agp','inhibition',agpDominant.id==='pi',b.piStroma,'s-right','t-reg-left-2'),
     regulation('reg_f6_f26b','f6c','e_f26b','inhibition',d.f6p>=35,d.f6p,'s-bottom','t-reg-right-2',undefined,undefined,[{x:230,y:393},{x:230,y:428}]),
   ]
-  if(spsDominant.id==='g6') edges.push(regulation('reg_g6_sps','g6c','e_sps','activation',true,spsDominant.strength,'s-bottom','t-reg-right-3',undefined,undefined,[{x:432,y:400},{x:700,y:400},{x:700,y:203}]))
+  // Salida superior de G6P: el corredor libre evita la tarjeta de FBPasa.
+  if(spsDominant.id==='g6') edges.push(regulation('reg_g6_sps','g6c','e_sps','activation',true,spsDominant.strength,'s-top','t-reg-bottom-3',undefined,undefined,[{x:432,y:230},{x:529,y:230}]))
   if(spsDominant.id==='sucrose') edges.push(regulation('reg_suc_sps','sucrose','e_sps','inhibition',true,spsDominant.strength,'s-right','t-reg-right-1','right',724))
 
   if(f26kDominant.id==='triose') edges.push(regulation('reg_tri_f26k','triosec','e_f26k','inhibition',true,f26kDominant.strength,'s-left','t-reg-left-3','left',18))

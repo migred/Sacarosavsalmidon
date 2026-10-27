@@ -1,6 +1,6 @@
 # Destino del carbono · React Flow
 
-Versión 1.0.12: sustituye los controles continuos por casos fisiológicos, traslada el selector al lateral, representa las concentraciones mediante flechas cualitativas e incorpora la degradación nocturna del almidón con maltosa y glucosa.
+Versión 1.0.13: recoloca la línea de activación de SPS por G6P para que no quede tapada por la tarjeta de fructosa-1,6-bisfosfatasa. Conserva los casos fisiológicos, las concentraciones cualitativas y la degradación nocturna del almidón de la versión anterior.
 
 Aplicación didáctica interactiva para estudiar la partición del carbono entre sacarosa y almidón. El mapa utiliza React Flow y un modelo continuo interno de regulación metabólica.
 
